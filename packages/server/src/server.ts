@@ -5,12 +5,8 @@ import {
   InitializeParams,
   InitializeResult,
   TextDocumentSyncKind,
-  DiagnosticSeverity,
-  type Diagnostic,
 } from "vscode-languageserver/node.js";
 import { TextDocument } from "vscode-languageserver-textdocument";
-import { parse as parseYaml } from "yaml";
-import type { OpenAPI } from "@openapi-lsp/core/openapi";
 import { OpenAPILanguageServer } from "./OpenAPILanaguageServer.js";
 
 const connection = createConnection(ProposedFeatures.all);
@@ -40,7 +36,7 @@ connection.onDefinition(async (params) => {
   return server.onDefinition(params);
 });
 
-connection.onHover(async (params) => {
+connection.onHover(async () => {
   return null;
 });
 
@@ -51,7 +47,6 @@ documents.onDidOpen((change) => {
 documents.onDidChangeContent((change) => {
   server.onDidChangeContent(change);
 });
-
 
 documents.listen(connection);
 connection.listen();

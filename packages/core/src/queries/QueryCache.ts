@@ -1,4 +1,4 @@
-import { err, none, ok, Option, Result, some } from "../utils/result.js";
+import { err, none, ok, Option, Result, some } from "../result/result.js";
 import { CacheKey, hashCacheKey, HashedCacheKey } from "./CacheKey.js";
 
 export type CacheValue = unknown;

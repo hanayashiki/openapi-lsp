@@ -5,11 +5,12 @@ import {
   DefinitionParams,
   TextDocumentChangeEvent,
 } from "vscode-languageserver";
-import { parseDocument } from "yaml";
+import { parseDocument, LineCounter } from "yaml";
 import { SpecDocument } from "./document/SpecDocument.js";
-import { SpecDocumentDefinitions } from "./document/SpecDefinition.js";
 import { analyzeSpecDocument } from "./analysis/analyze.js";
-import { SpecAnalysis } from "./analysis/SpecAnalysis.js";
+import { Analysis } from "./analysis/Analysis.js";
+import { getRefByPosition } from "./analysis/getRefByPosition.js";
+import { parseLocalRef } from "./analysis/parseLocalRef.js";
 
 export class OpenAPILanguageServer {
   cache = new QueryCache();
@@ -19,16 +20,18 @@ export class OpenAPILanguageServer {
   async onDidOpen(event: TextDocumentChangeEvent<TextDocument>) {
     this.cache.set(["specDocument.yamlAst", event.document.uri], {
       computeFn: async (): Promise<SpecDocument> => {
+        const lineCounter = new LineCounter();
         return {
           type: "openapi",
           uri: event.document.uri,
-          yamlAst: parseDocument(event.document.getText()),
+          yamlAst: parseDocument(event.document.getText(), { lineCounter }),
+          lineCounter,
         };
       },
     });
 
     this.cache.set(["specDocument.analyze", event.document.uri], {
-      computeFn: async (ctx): Promise<SpecAnalysis> => {
+      computeFn: async (ctx): Promise<Analysis> => {
         const yamlAst = (await ctx.load([
           "specDocument.yamlAst",
           event.document.uri,
@@ -38,16 +41,6 @@ export class OpenAPILanguageServer {
       },
     });
 
-    this.cache.set(["specDocument.getDefinitions", event.document.uri], {
-      computeFn: async (ctx): Promise<SpecDocumentDefinitions> => {
-        const yamlAst = (await ctx.load([
-          "specDocument.yamlAst",
-          event.document.uri,
-        ])) as SpecDocument;
-
-        return new Map();
-      },
-    });
   }
 
   // ----- TextDocuments handlers -----
@@ -59,6 +52,34 @@ export class OpenAPILanguageServer {
   async onDefinition(
     params: DefinitionParams
   ): Promise<DefinitionLink[] | null> {
-    return [];
+    const spec = (await this.cache.compute([
+      "specDocument.yamlAst",
+      params.textDocument.uri,
+    ])) as SpecDocument;
+
+    const analysis = (await this.cache.compute([
+      "specDocument.analyze",
+      params.textDocument.uri,
+    ])) as Analysis;
+
+    const ref = getRefByPosition(spec, params.position);
+    if (!ref) return null;
+
+    const path = parseLocalRef(ref.$ref);
+    if (!path) return null;
+
+    const definition = analysis.definitions.find(
+      (d) =>
+        d.path.length === path.length && d.path.every((p, i) => p === path[i])
+    );
+    if (!definition) return null;
+
+    return [
+      {
+        targetUri: params.textDocument.uri,
+        targetRange: definition.definitionRange,
+        targetSelectionRange: definition.componentNameRange,
+      },
+    ];
   }
 }

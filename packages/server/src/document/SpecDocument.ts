@@ -1,4 +1,4 @@
-import { Document as YamlDocument } from "yaml";
+import { Document as YamlDocument, LineCounter } from "yaml";
 
 export type SpecDocumentType = "openapi";
 
@@ -9,4 +9,5 @@ export type BaseSpecDocument<T extends SpecDocumentType> = {
 
 export type SpecDocument = BaseSpecDocument<"openapi"> & {
   yamlAst: YamlDocument;
+  lineCounter: LineCounter;
 };

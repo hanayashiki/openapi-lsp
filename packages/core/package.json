@@ -7,12 +7,16 @@
   "types": "./out/index.d.ts",
   "exports": {
     "./openapi": {
-      "types": "./out/openapi/index.d.ts",
-      "import": "./out/openapi/index.js"
+      "types": "./out/src/openapi/index.d.ts",
+      "import": "./out/src/openapi/index.js"
     },
     "./queries": {
-      "types": "./out/queries/index.d.ts",
-      "import": "./out/queries/index.js"
+      "types": "./out/src/queries/index.d.ts",
+      "import": "./out/src/queries/index.js"
+    },
+    "./result": {
+      "types": "./out/src/result/index.d.ts",
+      "import": "./out/src/result/index.js"
     }
   },
   "scripts": {
