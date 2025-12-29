@@ -11,6 +11,7 @@
   "scripts": {
     "build": "tsc -b",
     "watch": "tsc -b -w",
+    "bundle": "pnpm -r run bundle",
     "lint": "oxlint packages --ignore-pattern '*.d.ts'",
     "lint:fix": "oxlint packages --fix --ignore-pattern '*.d.ts'",
     "clean": "pnpm -r run clean",

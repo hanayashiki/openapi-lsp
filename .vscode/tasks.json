@@ -10,11 +10,10 @@
     },
     {
       "type": "npm",
-      "script": "watch",
+      "script": "bundle",
       "group": "build",
-      "label": "npm: watch",
-      "isBackground": true,
-      "problemMatcher": ["$tsc-watch"]
+      "label": "npm: bundle",
+      "dependsOn": ["npm: build"]
     }
   ]
 }

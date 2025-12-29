@@ -28,4 +28,4 @@ VS Code extension providing language support for OpenAPI specifications.
 
 ## License
 
-[MIT](./LICENSE)
+[MIT](./LICENSE.txt)

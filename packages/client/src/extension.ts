@@ -3,6 +3,7 @@ import {
   type ExtensionContext,
   workspace,
   window,
+  commands,
 } from "vscode";
 import {
   LanguageClient,
@@ -52,7 +53,6 @@ export async function activate(context: ExtensionContext): Promise<void> {
 
   try {
     await client.start();
-    window.showInformationMessage("OpenAPI Language Server started");
   } catch (error) {
     window.showErrorMessage(`Failed to start OpenAPI Language Server: ${error}`);
   }
@@ -62,6 +62,15 @@ export async function activate(context: ExtensionContext): Promise<void> {
       client?.stop();
     },
   });
+
+  context.subscriptions.push(
+    commands.registerCommand("openapi-lsp.restart", async () => {
+      if (client) {
+        await client.restart();
+        window.showInformationMessage("OpenAPI Language Server restarted");
+      }
+    })
+  );
 }
 
 export async function deactivate(): Promise<void> {
