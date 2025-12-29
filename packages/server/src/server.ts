@@ -18,10 +18,10 @@ connection.onInitialize((_params: InitializeParams): InitializeResult => {
   return {
     capabilities: {
       textDocumentSync: TextDocumentSyncKind.Incremental,
-      completionProvider: {
-        resolveProvider: true,
-        triggerCharacters: ["/", ":", '"', "'"],
-      },
+      // completionProvider: {
+      //   resolveProvider: true,
+      //   triggerCharacters: ["/", ":", '"', "'"],
+      // },
       hoverProvider: true,
       definitionProvider: true,
     },
@@ -36,8 +36,8 @@ connection.onDefinition(async (params) => {
   return server.onDefinition(params);
 });
 
-connection.onHover(async () => {
-  return null;
+connection.onHover(async (params) => {
+  return server.onHover(params);
 });
 
 documents.onDidOpen((change) => {

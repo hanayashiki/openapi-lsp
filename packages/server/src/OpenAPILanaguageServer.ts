@@ -3,6 +3,9 @@ import { TextDocument } from "vscode-languageserver-textdocument";
 import {
   DefinitionLink,
   DefinitionParams,
+  Hover,
+  HoverParams,
+  MarkupKind,
   TextDocumentChangeEvent,
 } from "vscode-languageserver";
 import { parseDocument, LineCounter } from "yaml";
@@ -11,6 +14,8 @@ import { analyzeSpecDocument } from "./analysis/analyze.js";
 import { Analysis } from "./analysis/Analysis.js";
 import { getRefByPosition } from "./analysis/getRefByPosition.js";
 import { parseLocalRef } from "./analysis/parseLocalRef.js";
+import { serializeSchemaToMarkdown } from "./analysis/serializeSchema.js";
+import { getComponentKeyByPosition } from "./analysis/getComponentKeyByPosition.js";
 
 export class OpenAPILanguageServer {
   cache = new QueryCache();
@@ -45,7 +50,7 @@ export class OpenAPILanguageServer {
 
   // ----- TextDocuments handlers -----
   async onDidChangeContent(event: TextDocumentChangeEvent<TextDocument>) {
-    this.cache.invalidateByKey(["SpecDocument", event.document.uri]);
+    this.cache.invalidateByKey(["specDocument.yamlAst", event.document.uri]);
   }
 
   // ----- Language features handlers -----
@@ -81,5 +86,54 @@ export class OpenAPILanguageServer {
         targetSelectionRange: definition.componentNameRange,
       },
     ];
+  }
+
+  async onHover(params: HoverParams): Promise<Hover | null> {
+    const spec = (await this.cache.compute([
+      "specDocument.yamlAst",
+      params.textDocument.uri,
+    ])) as SpecDocument;
+
+    const analysis = (await this.cache.compute([
+      "specDocument.analyze",
+      params.textDocument.uri,
+    ])) as Analysis;
+
+    // Try to find definition from $ref
+    let definition = null;
+    const ref = getRefByPosition(spec, params.position);
+    if (ref) {
+      const path = parseLocalRef(ref.$ref);
+      if (path) {
+        definition = analysis.definitions.find(
+          (d) =>
+            d.path.length === path.length && d.path.every((p, i) => p === path[i])
+        );
+      }
+    }
+
+    // If not on a $ref, check if on a component key
+    if (!definition) {
+      definition = getComponentKeyByPosition(analysis, params.position);
+    }
+
+    if (!definition) return null;
+
+    // Only handle schema definitions for now
+    if (definition.component.kind !== "schema") return null;
+
+    const name = definition.path[definition.path.length - 1];
+    const markdown = serializeSchemaToMarkdown(
+      definition.component.value,
+      name,
+      analysis.document
+    );
+
+    return {
+      contents: {
+        kind: MarkupKind.Markdown,
+        value: markdown,
+      },
+    };
   }
 }

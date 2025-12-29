@@ -73,18 +73,16 @@ export class QueryCache {
     entry.upstreams = new Set();
 
     const ctx: CacheComputeContext = {
-      load: async (key: CacheKey) => {
+      load: async (upstreamKey: CacheKey) => {
         // TODO: if we detect a cycle, we should throw an error here
 
-        const upstream = unwrapGetResult(await this.get(key));
+        const upstream = unwrapGetResult(await this.get(upstreamKey));
+        upstream.downstreams.add(key);
+        entry.upstreams.add(upstreamKey);
 
         if (upstream.value.success) {
           return upstream.value.data;
         }
-
-        // Register dependencys
-        upstream.downstreams.add(key);
-        entry.upstreams.add(key);
 
         const result = await upstream.computeFn(ctx);
 
@@ -95,6 +93,7 @@ export class QueryCache {
     const p = (async () => {
       try {
         const value = await entry.computeFn(ctx);
+
         entry.value = some(value);
         return value;
       } finally {
