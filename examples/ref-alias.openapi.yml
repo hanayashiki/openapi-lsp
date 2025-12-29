@@ -1,0 +1,53 @@
+openapi: 3.0.0
+info:
+  title: Ref Alias Example
+  version: 1.0.0
+paths:
+  /pets:
+    get:
+      summary: Get all pets
+      responses:
+        '200':
+          description: List of pets
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Pet'
+    post:
+      summary: Create a pet
+      requestBody:
+        $ref: '#/components/requestBodies/CreatePet'
+      responses:
+        '201':
+          description: Pet created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Pet'
+components:
+  schemas:
+    # Pet is an alias - its value is a $ref, not a schema object
+    Pet:
+      $ref: '#/components/schemas/Animal'
+    Animal:
+      title: An Animal
+      description: Base animal type
+      type: object
+      properties:
+        name:
+          type: string
+        species:
+          type: string
+  requestBodies:
+    # CreatePet is an alias to another requestBody
+    CreatePet:
+      $ref: '#/components/requestBodies/CreateAnimal'
+    CreateAnimal:
+      description: Request body for creating an animal
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Animal'

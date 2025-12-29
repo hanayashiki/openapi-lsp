@@ -34,22 +34,13 @@ export async function activate(context: ExtensionContext): Promise<void> {
 
   const clientOptions: LanguageClientOptions = {
     documentSelector: [
-      { scheme: "file", language: "yaml" },
-      { scheme: "file", language: "json" },
       { scheme: "file", language: "openapi" },
-      { scheme: "file", pattern: "**/*.openapi.yaml" },
       { scheme: "file", pattern: "**/*.openapi.yml" },
-      { scheme: "file", pattern: "**/*.openapi.json" },
-      { scheme: "file", pattern: "**/openapi.yaml" },
       { scheme: "file", pattern: "**/openapi.yml" },
-      { scheme: "file", pattern: "**/openapi.json" },
-      { scheme: "file", pattern: "**/swagger.yaml" },
-      { scheme: "file", pattern: "**/swagger.yml" },
-      { scheme: "file", pattern: "**/swagger.json" },
     ],
     synchronize: {
       fileEvents: workspace.createFileSystemWatcher(
-        "**/*.{yaml,yml,json}"
+        "**/{*.openapi.yml,openapi.yml}"
       ),
     },
   };

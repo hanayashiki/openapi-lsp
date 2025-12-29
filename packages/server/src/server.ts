@@ -29,7 +29,7 @@ connection.onInitialize((_params: InitializeParams): InitializeResult => {
 });
 
 connection.onInitialized(() => {
-  connection.console.log("OpenAPI Language Server initialized");
+  console.log("OpenAPI Language Server initialized");
 });
 
 connection.onDefinition(async (params) => {

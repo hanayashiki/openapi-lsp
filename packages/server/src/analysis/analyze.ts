@@ -14,7 +14,7 @@ export const analyzeSpecDocument = async (
 ): Promise<Analysis> => {
   try {
     // Pass raw input first to capture all typebox validation errors
-    const document = DocumentParser.Decode(spec.yamlAst.toJS());
+    const document = DocumentParser.Encode(spec.yamlAst.toJS());
 
     return {
       document,
@@ -23,8 +23,9 @@ export const analyzeSpecDocument = async (
     };
   } catch (e) {
     if (e instanceof AssertError) {
-      const fellbackInput = DocumentInputParser.Decode(spec.yamlAst.toJS());
-      const document = DocumentParser.Decode(fellbackInput);
+      const fellbackInput = DocumentInputParser.Encode(spec.yamlAst.toJS());
+
+      const document = DocumentParser.Parse(fellbackInput);
 
       return {
         document,

@@ -1,0 +1,17 @@
+not-openapi:
+  $ref: '#/a'
+info: {}
+components:
+  schemas:
+    # Pet is an alias - its value is a $ref, not a schema object
+    Pet:
+      $ref: '#/components/schemas/Animal'
+    Animal:
+      title: An Animal
+      description: Base animal type
+      type: object
+      properties:
+        name:
+          type: string
+        species:
+          type: string

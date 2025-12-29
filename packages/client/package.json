@@ -8,23 +8,36 @@
   "engines": {
     "vscode": "^1.85.0"
   },
-  "categories": ["Programming Languages", "Linters"],
-  "activationEvents": [
-    "onLanguage:yaml",
-    "onLanguage:json",
-    "workspaceContains:**/openapi.yaml",
-    "workspaceContains:**/openapi.json",
-    "workspaceContains:**/swagger.yaml",
-    "workspaceContains:**/swagger.json"
+  "categories": [
+    "Programming Languages"
   ],
   "main": "./out/extension.js",
   "contributes": {
     "languages": [
       {
         "id": "openapi",
-        "aliases": ["OpenAPI", "Swagger"],
-        "extensions": [".openapi.yaml", ".openapi.yml", ".openapi.json"],
-        "configuration": "./language-configuration.json"
+        "aliases": [
+          "OpenAPI",
+          "Swagger"
+        ],
+        "extensions": [
+          ".openapi.yml"
+        ],
+        "filenames": [
+          "openapi.yml"
+        ],
+        "configuration": "./language-configuration.json",
+        "icon": {
+          "light": "./icons/logo.svg",
+          "dark": "./icons/logo.svg"
+        }
+      }
+    ],
+    "grammars": [
+      {
+        "language": "openapi",
+        "scopeName": "source.yaml",
+        "path": "./syntaxes/yaml.tmLanguage.json"
       }
     ],
     "configuration": {
@@ -34,7 +47,11 @@
         "openapi-lsp.trace.server": {
           "scope": "window",
           "type": "string",
-          "enum": ["off", "messages", "verbose"],
+          "enum": [
+            "off",
+            "messages",
+            "verbose"
+          ],
           "default": "off",
           "description": "Traces the communication between VS Code and the language server."
         },

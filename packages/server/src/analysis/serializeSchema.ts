@@ -1,5 +1,4 @@
 import { OpenAPI } from "@openapi-lsp/core/openapi";
-import { parseLocalRef } from "./parseLocalRef.js";
 
 // Public options
 export interface SerializeOptions {
@@ -8,11 +7,9 @@ export interface SerializeOptions {
 
 // Internal context
 interface SerializerContext {
-  document: OpenAPI.Document;
   currentDepth: number;
   maxDepth: number;
   indent: number;
-  visitedRefs: Set<string>;
 }
 
 // Type guard for $ref
@@ -29,26 +26,6 @@ function isReference(value: unknown): value is OpenAPI.Reference {
 function getRefTypeName(ref: OpenAPI.Reference): string {
   const parts = ref.$ref.split("/");
   return parts[parts.length - 1];
-}
-
-// Resolve $ref to its target schema
-function resolveRef(
-  ref: OpenAPI.Reference,
-  document: OpenAPI.Document
-): OpenAPI.Schema | null {
-  const path = parseLocalRef(ref.$ref);
-  if (!path) return null;
-
-  let current: unknown = document;
-  for (const segment of path) {
-    if (current && typeof current === "object" && segment in current) {
-      current = (current as Record<string, unknown>)[segment];
-    } else {
-      return null;
-    }
-  }
-
-  return current as OpenAPI.Schema;
 }
 
 // Serialize primitive types
@@ -196,29 +173,9 @@ function serializeSchema(
   schema: OpenAPI.Schema | OpenAPI.Reference,
   ctx: SerializerContext
 ): string {
-  // Handle $ref
+  // Handle $ref - just return the type name
   if (isReference(schema)) {
-    const typeName = getRefTypeName(schema);
-
-    // At depth limit or circular ref, just return type name
-    if (ctx.currentDepth >= ctx.maxDepth || ctx.visitedRefs.has(schema.$ref)) {
-      return typeName;
-    }
-
-    // Resolve and serialize
-    const resolved = resolveRef(schema, ctx.document);
-    if (!resolved) {
-      return typeName;
-    }
-
-    // Track visited ref
-    const newVisited = new Set(ctx.visitedRefs);
-    newVisited.add(schema.$ref);
-
-    return serializeSchema(resolved, {
-      ...ctx,
-      visitedRefs: newVisited,
-    });
+    return getRefTypeName(schema);
   }
 
   // Depth limit reached
@@ -266,20 +223,87 @@ function serializeSchema(
 export function serializeSchemaToMarkdown(
   schema: OpenAPI.Schema | OpenAPI.Reference,
   name: string,
-  document: OpenAPI.Document,
   options: SerializeOptions = {}
 ): string {
   const { maxDepth = 2 } = options;
 
   const ctx: SerializerContext = {
-    document,
     currentDepth: 0,
     maxDepth,
     indent: 0,
-    visitedRefs: new Set(),
   };
 
   const serialized = serializeSchema(schema, ctx);
 
-  return `\`\`\`typescript\ntype ${name} = ${serialized}\n\`\`\``;
+  // Build markdown output
+  const parts: string[] = [];
+
+  // Add title/description if schema is not a reference
+  if (!isReference(schema)) {
+    if (schema.title) {
+      parts.push(`**${schema.title}**`);
+    }
+    if (schema.description) {
+      parts.push(schema.description);
+    }
+  }
+
+  // Add code block
+  parts.push(`\`\`\`typescript\ntype ${name} = ${serialized}\n\`\`\``);
+
+  return parts.join("\n\n");
+}
+
+/**
+ * Serialize an OpenAPI RequestBody to markdown for hover display
+ */
+export function serializeRequestBodyToMarkdown(
+  requestBody: OpenAPI.RequestBody | OpenAPI.Reference,
+  name: string,
+  options: SerializeOptions = {}
+): string {
+  const { maxDepth = 2 } = options;
+
+  // If it's a reference, just show the ref
+  if (isReference(requestBody)) {
+    return `\`\`\`typescript\n(requestBody) ${name}\n\`\`\``;
+  }
+
+  const parts: string[] = [];
+
+  // Add description if present
+  if (requestBody.description) {
+    parts.push(requestBody.description);
+  }
+
+  // Add required status
+  if (requestBody.required) {
+    parts.push("**Required**");
+  }
+
+  // Get schema from content (use first media type's schema)
+  const content = requestBody.content;
+  const mediaTypes = Object.keys(content);
+
+  if (mediaTypes.length > 0) {
+    // Show media types
+    parts.push(`Media types: ${mediaTypes.map(mt => `\`${mt}\``).join(", ")}`);
+
+    // Get the first schema to display
+    const firstMediaType = content[mediaTypes[0]];
+    const schema = firstMediaType?.schema;
+
+    if (schema) {
+      const ctx: SerializerContext = {
+        currentDepth: 0,
+        maxDepth,
+        indent: 0,
+      };
+
+      const serialized = serializeSchema(schema, ctx);
+      parts.push(`\`\`\`typescript\n(requestBody) ${name}: ${serialized}\n\`\`\``);
+    }
+  }
+
+  return parts.join("\n\n");
 }

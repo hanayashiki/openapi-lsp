@@ -14,8 +14,12 @@ import { analyzeSpecDocument } from "./analysis/analyze.js";
 import { Analysis } from "./analysis/Analysis.js";
 import { getRefByPosition } from "./analysis/getRefByPosition.js";
 import { parseLocalRef } from "./analysis/parseLocalRef.js";
-import { serializeSchemaToMarkdown } from "./analysis/serializeSchema.js";
+import {
+  serializeSchemaToMarkdown,
+  serializeRequestBodyToMarkdown,
+} from "./analysis/serializeSchema.js";
 import { getComponentKeyByPosition } from "./analysis/getComponentKeyByPosition.js";
+import { resolveRef } from "./analysis/resolveRef.js";
 
 export class OpenAPILanguageServer {
   cache = new QueryCache();
@@ -45,7 +49,6 @@ export class OpenAPILanguageServer {
         return analyzeSpecDocument(yamlAst);
       },
     });
-
   }
 
   // ----- TextDocuments handlers -----
@@ -103,13 +106,7 @@ export class OpenAPILanguageServer {
     let definition = null;
     const ref = getRefByPosition(spec, params.position);
     if (ref) {
-      const path = parseLocalRef(ref.$ref);
-      if (path) {
-        definition = analysis.definitions.find(
-          (d) =>
-            d.path.length === path.length && d.path.every((p, i) => p === path[i])
-        );
-      }
+      definition = resolveRef(ref, analysis);
     }
 
     // If not on a $ref, check if on a component key
@@ -119,15 +116,19 @@ export class OpenAPILanguageServer {
 
     if (!definition) return null;
 
-    // Only handle schema definitions for now
-    if (definition.component.kind !== "schema") return null;
-
     const name = definition.path[definition.path.length - 1];
-    const markdown = serializeSchemaToMarkdown(
-      definition.component.value,
-      name,
-      analysis.document
-    );
+    let markdown: string | null = null;
+
+    switch (definition.component.kind) {
+      case "schema":
+        markdown = serializeSchemaToMarkdown(definition.component.value, name);
+        break;
+      case "requestBody":
+        markdown = serializeRequestBodyToMarkdown(definition.component.value, name);
+        break;
+    }
+
+    if (!markdown) return null;
 
     return {
       contents: {

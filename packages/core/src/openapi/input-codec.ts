@@ -14,7 +14,7 @@ import Type from "typebox";
 // String codecs
 // ---------------------------------------------------------------------------
 export const FallbackString = (defaultValue: string) =>
-  Type.Encode(Type.String(), (value): string =>
+  Type.Encode(Type.String({ default: defaultValue }), (value): string =>
     typeof value === "string" ? value : defaultValue
   );
 
@@ -28,7 +28,7 @@ export const FallbackOptionalString = () =>
 // Number codecs
 // ---------------------------------------------------------------------------
 export const FallbackNumber = (defaultValue: number) =>
-  Type.Encode(Type.Number(), (value): number =>
+  Type.Encode(Type.Number({ default: defaultValue }), (value): number =>
     typeof value === "number" && !Number.isNaN(value) ? value : defaultValue
   );
 
@@ -43,7 +43,7 @@ export const FallbackOptionalNumber = () =>
 // Integer codecs
 // ---------------------------------------------------------------------------
 export const FallbackInteger = (defaultValue: number) =>
-  Type.Encode(Type.Integer(), (value): number =>
+  Type.Encode(Type.Integer({ default: defaultValue }), (value): number =>
     typeof value === "number" && Number.isInteger(value) ? value : defaultValue
   );
 
@@ -58,7 +58,7 @@ export const FallbackOptionalInteger = () =>
 // Boolean codecs
 // ---------------------------------------------------------------------------
 export const FallbackBoolean = (defaultValue: boolean) =>
-  Type.Encode(Type.Boolean(), (value): boolean =>
+  Type.Encode(Type.Boolean({ default: defaultValue }), (value): boolean =>
     typeof value === "boolean" ? value : defaultValue
   );
 
@@ -79,11 +79,10 @@ function isInLiterals(literals: readonly string[], value: unknown): boolean {
 export function FallbackLiteralUnion<const T extends readonly string[]>(
   literals: T
 ) {
-  return Type.Encode(
-    Type.Union(literals.map((l) => Type.Literal(l))),
-    ((value: unknown): T[number] =>
-      isInLiterals(literals, value) ? (value as T[number]) : literals[0]) as any
-  );
+  return Type.Encode(Type.Union(literals.map((l) => Type.Literal(l))), ((
+    value: unknown
+  ): T[number] =>
+    isInLiterals(literals, value) ? (value as T[number]) : literals[0]) as any);
 }
 
 export function FallbackOptionalLiteralUnion<const T extends readonly string[]>(
@@ -125,10 +124,8 @@ export function FallbackRecord<
   V extends Type.TSchema
 >(keySchema: K, valueSchema: V) {
   const recordType = Type.Record(keySchema, valueSchema);
-  return Type.Encode(
-    recordType,
-    ((value: unknown) => (isPlainObject(value) ? value : {})) as any
-  ) as unknown as typeof recordType;
+  return Type.Encode(recordType, ((value: unknown) =>
+    isPlainObject(value) ? value : {}) as any) as unknown as typeof recordType;
 }
 
 export function FallbackOptionalRecord<
@@ -147,19 +144,19 @@ export function FallbackOptionalRecord<
 // ---------------------------------------------------------------------------
 
 export function FallbackObject<T extends Type.TObject>(schema: T): T {
-  return Type.Encode(
-    schema,
-    ((value: unknown) => (isPlainObject(value) ? value : {})) as any
-  ) as unknown as T;
+  return Type.Encode(schema, ((value: unknown) =>
+    isPlainObject(value) ? value : {}) as any) as unknown as T;
 }
 
 export function FallbackOptionalObject<T extends Type.TObject>(
   schema: T
 ): Type.TOptional<T> {
-  return Type.Encode(
-    Type.Optional(Type.Union([Type.Undefined(), schema])),
-    ((value: unknown) => (isPlainObject(value) ? value : undefined)) as any
-  ) as unknown as Type.TOptional<T>;
+  return Type.Encode(Type.Optional(Type.Union([Type.Undefined(), schema])), ((
+    value: unknown
+  ) =>
+    isPlainObject(value)
+      ? value
+      : undefined) as any) as unknown as Type.TOptional<T>;
 }
 
 // ---------------------------------------------------------------------------
