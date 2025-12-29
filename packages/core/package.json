@@ -1,0 +1,33 @@
+{
+  "name": "@openapi-lsp/core",
+  "version": "0.0.1",
+  "description": "Shared types and utilities for OpenAPI LSP",
+  "type": "module",
+  "main": "./out/index.js",
+  "types": "./out/index.d.ts",
+  "exports": {
+    "./openapi": {
+      "types": "./out/openapi/index.d.ts",
+      "import": "./out/openapi/index.js"
+    },
+    "./queries": {
+      "types": "./out/queries/index.d.ts",
+      "import": "./out/queries/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "watch": "tsc -b -w",
+    "test": "vitest run",
+    "clean": "rm -rf out *.tsbuildinfo"
+  },
+  "dependencies": {
+    "js-md5": "^0.8.3",
+    "typebox": "^1.0.69"
+  },
+  "devDependencies": {
+    "@types/js-md5": "^0.7.2",
+    "typescript": "catalog:",
+    "vitest": "^4.0.16"
+  }
+}

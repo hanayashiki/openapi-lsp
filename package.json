@@ -1,0 +1,26 @@
+{
+  "name": "openapi-lsp",
+  "version": "0.0.1",
+  "description": "OpenAPI Language Server Protocol implementation for VS Code",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "watch": "tsc -b -w",
+    "lint": "oxlint packages --ignore-pattern '*.d.ts'",
+    "lint:fix": "oxlint packages --fix --ignore-pattern '*.d.ts'",
+    "clean": "pnpm -r run clean",
+    "test": "pnpm -r run test",
+    "package": "pnpm --filter @openapi-lsp/client run package"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "oxlint": "^0.15.3",
+    "typescript": "^5.7.2"
+  },
+  "packageManager": "pnpm@9.15.1"
+}
