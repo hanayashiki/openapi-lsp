@@ -21,8 +21,24 @@
       "type": "extensionHost",
       "request": "launch",
       "args": [
+        "--disable-extensions",
         "--extensionDevelopmentPath=${workspaceFolder}/packages/client",
         "${workspaceFolder}/examples"
+      ],
+      "outFiles": [
+        "${workspaceFolder}/packages/client/out/**/*.js",
+        "${workspaceFolder}/packages/server/out/**/*.js"
+      ],
+      "preLaunchTask": "npm: build"
+    },
+    {
+      "name": "Launch Extension (Display)",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": [
+        "--disable-extensions",
+        "--extensionDevelopmentPath=${workspaceFolder}/packages/client",
+        "${workspaceFolder}/examples/display"
       ],
       "outFiles": [
         "${workspaceFolder}/packages/client/out/**/*.js",
@@ -36,15 +52,16 @@
       "request": "attach",
       "port": 6009,
       "restart": true,
-      "outFiles": [
-        "${workspaceFolder}/packages/server/out/**/*.js"
-      ]
+      "outFiles": ["${workspaceFolder}/packages/server/out/**/*.js"]
     }
   ],
   "compounds": [
     {
       "name": "Extension + Server",
-      "configurations": ["Launch Extension (Debug Server)", "Attach to Language Server"]
+      "configurations": [
+        "Launch Extension (Debug Server)",
+        "Attach to Language Server"
+      ]
     }
   ]
 }
