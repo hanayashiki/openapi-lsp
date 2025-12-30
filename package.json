@@ -9,21 +9,22 @@
     "pnpm": ">=9.0.0"
   },
   "scripts": {
-    "build": "tsc -b",
-    "watch": "tsc -b -w",
+    "build": "pnpm --filter openapilspclient run bundle",
+    "watch": "pnpm --filter openapilspclient run watch",
+    "typecheck": "tsc -b",
     "bundle": "pnpm -r run bundle",
     "lint": "oxlint packages --ignore-pattern '*.d.ts'",
     "lint:fix": "oxlint packages --fix --ignore-pattern '*.d.ts'",
     "clean": "pnpm -r run clean",
     "test": "pnpm -r run test",
-    "package": "pnpm --filter @openapi-lsp/client run package",
+    "package": "pnpm --filter openapilspclient run package",
     "prepare": "husky"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
     "husky": "^9.1.7",
-    "oxlint": "^0.15.3",
-    "typescript": "^5.7.2"
+    "oxlint": "^1.36.0",
+    "typescript": "catalog:"
   },
-  "packageManager": "pnpm@9.15.1"
+  "packageManager": "pnpm@10.26.2"
 }

@@ -8,19 +8,11 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "declaration": true,
-    "declarationMap": true,
-    "sourceMap": true,
-    "composite": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
-    "resolveJsonModule": true
-  },
-  "references": [
-    { "path": "./packages/core" },
-    { "path": "./packages/server" },
-    { "path": "./packages/client" }
-  ]
+    "resolveJsonModule": true,
+    "noEmit": true
+  }
 }

@@ -1,12 +1,11 @@
 import { OpenAPI } from "@openapi-lsp/core/openapi";
-import { AssertError } from "typebox/value";
-import { Option } from "@openapi-lsp/core/result";
 import { Range } from "vscode-languageserver-textdocument";
 import { SpecDocumentPath } from "./SpecDocument.js";
+import { ZodError } from "zod";
 
 export interface Analysis {
   document: OpenAPI.Document;
-  typeboxError: Option<AssertError>;
+  zodError: ZodError | null;
   definitions: Definition[];
 }
 

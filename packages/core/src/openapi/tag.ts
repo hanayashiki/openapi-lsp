@@ -1,56 +1,56 @@
-import Type from "typebox";
+import { core, z, ZodObject } from "zod";
+import { util } from "zod/v4/core";
 
-export const OpenAPITag = Type.Union([
-  Type.Literal("Reference"),
-  Type.Literal("ExternalDocumentation"),
-  Type.Literal("XML"),
-  Type.Literal("Discriminator"),
-  Type.Literal("Schema"),
-  Type.Literal("MediaType"),
-  Type.Literal("Example"),
-  Type.Literal("Encoding"),
-  Type.Literal("Header"),
-  Type.Literal("Link"),
-  Type.Literal("Server"),
-  Type.Literal("ServerVariable"),
-  Type.Literal("Response"),
-  Type.Literal("Parameter"),
-  Type.Literal("RequestBody"),
-  Type.Literal("Callback"),
-  Type.Literal("SecurityRequirement"),
-  Type.Literal("Operation"),
-  Type.Literal("PathItem"),
-  Type.Literal("SecurityScheme"),
-  Type.Literal("OAuthFlows"),
-  Type.Literal("OAuthFlow"),
-  Type.Literal("Components"),
-  Type.Literal("Tag"),
-  Type.Literal("Contact"),
-  Type.Literal("License"),
-  Type.Literal("Info"),
-  Type.Literal("Document"),
+export const OpenAPITag = z.enum([
+  "Reference",
+  "ExternalDocumentation",
+  "XML",
+  "Discriminator",
+  "Schema",
+  "MediaType",
+  "Example",
+  "Encoding",
+  "Header",
+  "Link",
+  "Server",
+  "ServerVariable",
+  "Response",
+  "Parameter",
+  "RequestBody",
+  "Callback",
+  "SecurityRequirement",
+  "Operation",
+  "PathItem",
+  "SecurityScheme",
+  "OAuthFlows",
+  "OAuthFlow",
+  "Components",
+  "Tag",
+  "Contact",
+  "License",
+  "Info",
+  "Document",
 ]);
 
-export type OpenAPITag = Type.Static<typeof OpenAPITag>;
-
-export type TaggedMetadata = {
-  tag: OpenAPITag;
-};
+export type OpenAPITag = z.infer<typeof OpenAPITag>;
 
 const tagStorage = new WeakMap<object, OpenAPITag>();
 
-export const TaggedObject = <T extends Type.TObject>(
-  schema: T,
+export const TaggedObject = <T extends core.$ZodLooseShape>(
+  shape: T,
   tag: OpenAPITag
-): T => {
-  return Type.Codec(schema)
-    .Decode((value) => {
-      tagStorage.set(value as object, tag);
-      return value;
-    })
-    .Encode((value) => value) as T;
+): ZodObject<util.Writeable<T>, core.$strip> => {
+  return z.object(shape).transform((value) => {
+    tagStorage.set(value, tag);
+    return value;
+  }) as never;
 };
 
 export const getOpenAPITag = (obj: object): OpenAPITag | undefined => {
   return tagStorage.get(obj);
+};
+
+// Helper for manually tagging objects (used for recursive types with z.lazy)
+export const setOpenAPITag = (obj: object, tag: OpenAPITag): void => {
+  tagStorage.set(obj, tag);
 };

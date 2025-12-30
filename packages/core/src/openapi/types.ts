@@ -2,113 +2,107 @@
  * Shared types and utilities for OpenAPI LSP
  * Based on OpenAPI Specification v3.0.3
  * https://spec.openapis.org/oas/v3.0.3.html
+ *
+ * Zod v4 implementation
  */
 
-import Type from "typebox";
-//import { Settings } from "typebox/system";
-import { TaggedObject } from "./tag.js";
+import { z } from "zod";
+import { setOpenAPITag, TaggedObject } from "./tag.js";
 
 // ------------------------------------------------------------------------------
 // OpenAPI Namespace
 //
 // Strict types matching OpenAPI 3.0.3 specification
-// Uses Type.Cyclic only for Schema (the only truly recursive type)
+// Uses z.lazy() only for Schema (the only truly recursive type)
 // All other types use direct references
 // ------------------------------------------------------------------------------
 export namespace OpenAPI {
-  // @see https://github.com/sinclairzx81/typebox/issues/1495
-  // the bug erases settings by `Type.Codec` so decoding does not work in `TaggedObject`
-  //Settings.Set({ enumerableKind: true });
-
   // ===========================================================================
   // Layer 1: Leaf types (no dependencies)
   // ===========================================================================
 
   // Reference Object - used at use sites for referenceable types
   export const Reference = TaggedObject(
-    Type.Object({
-      $ref: Type.String(),
-    }),
+    {
+      $ref: z.string(),
+    },
     "Reference"
   );
 
   // XML Object
   export const XML = TaggedObject(
-    Type.Object({
-      name: Type.Optional(Type.String()),
-      namespace: Type.Optional(Type.String()),
-      prefix: Type.Optional(Type.String()),
-      attribute: Type.Optional(Type.Boolean()),
-      wrapped: Type.Optional(Type.Boolean()),
-    }),
+    {
+      name: z.string().optional(),
+      namespace: z.string().optional(),
+      prefix: z.string().optional(),
+      attribute: z.boolean().optional(),
+      wrapped: z.boolean().optional(),
+    },
     "XML"
   );
 
   // Discriminator Object
   export const Discriminator = TaggedObject(
-    Type.Object({
-      propertyName: Type.String(),
-      mapping: Type.Optional(Type.Record(Type.String(), Type.String())),
-    }),
+    {
+      propertyName: z.string(),
+      mapping: z.record(z.string(), z.string()).optional(),
+    },
     "Discriminator"
   );
 
   // Contact Object
   export const Contact = TaggedObject(
-    Type.Object({
-      name: Type.Optional(Type.String()),
-      url: Type.Optional(Type.String()),
-      email: Type.Optional(Type.String()),
-    }),
+    {
+      name: z.string().optional(),
+      url: z.string().optional(),
+      email: z.string().optional(),
+    },
     "Contact"
   );
 
   // License Object
   export const License = TaggedObject(
-    Type.Object({
-      name: Type.String(),
-      url: Type.Optional(Type.String()),
-    }),
+    {
+      name: z.string(),
+      url: z.string().optional(),
+    },
     "License"
   );
 
   // Server Variable Object
   export const ServerVariable = TaggedObject(
-    Type.Object({
-      enum: Type.Optional(Type.Array(Type.String())),
-      default: Type.String(),
-      description: Type.Optional(Type.String()),
-    }),
+    {
+      enum: z.array(z.string()).optional(),
+      default: z.string(),
+      description: z.string().optional(),
+    },
     "ServerVariable"
   );
 
   // OAuth Flow Object
   export const OAuthFlow = TaggedObject(
-    Type.Object({
-      authorizationUrl: Type.Optional(Type.String()),
-      tokenUrl: Type.Optional(Type.String()),
-      refreshUrl: Type.Optional(Type.String()),
-      scopes: Type.Record(Type.String(), Type.String()),
-    }),
+    {
+      authorizationUrl: z.string().optional(),
+      tokenUrl: z.string().optional(),
+      refreshUrl: z.string().optional(),
+      scopes: z.record(z.string(), z.string()),
+    },
     "OAuthFlow"
   );
 
   // Example Object
   export const Example = TaggedObject(
-    Type.Object({
-      summary: Type.Optional(Type.String()),
-      description: Type.Optional(Type.String()),
-      value: Type.Optional(Type.Unknown()),
-      externalValue: Type.Optional(Type.String()),
-    }),
+    {
+      summary: z.string().optional(),
+      description: z.string().optional(),
+      value: z.unknown().optional(),
+      externalValue: z.string().optional(),
+    },
     "Example"
   );
 
   // Security Requirement Object
-  export const SecurityRequirement = Type.Record(
-    Type.String(),
-    Type.Array(Type.String())
-  );
+  export const SecurityRequirement = z.record(z.string(), z.array(z.string()));
 
   // ===========================================================================
   // Layer 2: Simple composed types
@@ -116,89 +110,135 @@ export namespace OpenAPI {
 
   // External Documentation Object
   export const ExternalDocumentation = TaggedObject(
-    Type.Object({
-      description: Type.Optional(Type.String()),
-      url: Type.String(),
-    }),
+    {
+      description: z.string().optional(),
+      url: z.string(),
+    },
     "ExternalDocumentation"
   );
 
   // OAuth Flows Object
   export const OAuthFlows = TaggedObject(
-    Type.Object({
-      implicit: Type.Optional(OAuthFlow),
-      password: Type.Optional(OAuthFlow),
-      clientCredentials: Type.Optional(OAuthFlow),
-      authorizationCode: Type.Optional(OAuthFlow),
-    }),
+    {
+      implicit: OAuthFlow.optional(),
+      password: OAuthFlow.optional(),
+      clientCredentials: OAuthFlow.optional(),
+      authorizationCode: OAuthFlow.optional(),
+    },
     "OAuthFlows"
   );
 
   // Server Object
   export const Server = TaggedObject(
-    Type.Object({
-      url: Type.String(),
-      description: Type.Optional(Type.String()),
-      variables: Type.Optional(Type.Record(Type.String(), ServerVariable)),
-    }),
+    {
+      url: z.string(),
+      description: z.string().optional(),
+      variables: z.record(z.string(), ServerVariable).optional(),
+    },
     "Server"
   );
 
   // ===========================================================================
-  // Layer 3: Schema (recursive - uses Type.Cyclic)
+  // Layer 3: Schema (recursive - uses z.lazy)
   // ===========================================================================
 
-  // Helper to create "Schema | Reference" union for use inside Schema
-  const SchemaOrRef = Type.Union([Type.Ref("Schema"), Reference]);
+  // Define the Schema type for self-reference
+  type SchemaType = {
+    // JSON Schema properties
+    title?: string;
+    multipleOf?: number;
+    maximum?: number;
+    exclusiveMaximum?: boolean;
+    minimum?: number;
+    exclusiveMinimum?: boolean;
+    maxLength?: number;
+    minLength?: number;
+    pattern?: string;
+    maxItems?: number;
+    minItems?: number;
+    uniqueItems?: boolean;
+    maxProperties?: number;
+    minProperties?: number;
+    required?: string[];
+    enum?: unknown[];
 
-  export const Schema = Type.Cyclic(
-    {
-      Schema: Type.Object({
+    // Modified JSON Schema properties
+    type?: string;
+    allOf?: (SchemaType | Reference)[];
+    oneOf?: (SchemaType | Reference)[];
+    anyOf?: (SchemaType | Reference)[];
+    not?: SchemaType | Reference;
+    items?: SchemaType | Reference;
+    properties?: Record<string, SchemaType | Reference>;
+    additionalProperties?: boolean | SchemaType | Reference;
+    description?: string;
+    format?: string;
+    default?: unknown;
+
+    // OpenAPI-specific properties
+    nullable?: boolean;
+    discriminator?: Discriminator;
+    readOnly?: boolean;
+    writeOnly?: boolean;
+    xml?: XML;
+    externalDocs?: ExternalDocumentation;
+    example?: unknown;
+    deprecated?: boolean;
+  };
+
+  // Helper to create "Schema | Reference" union for use inside Schema
+  const SchemaOrRef: z.ZodType<SchemaType | Reference> = z.lazy(() =>
+    z.union([Reference, Schema])
+  );
+
+  export const Schema: z.ZodType<SchemaType> = z.lazy(() =>
+    z
+      .object({
         // JSON Schema properties
-        title: Type.Optional(Type.String()),
-        multipleOf: Type.Optional(Type.Number()),
-        maximum: Type.Optional(Type.Number()),
-        exclusiveMaximum: Type.Optional(Type.Boolean()),
-        minimum: Type.Optional(Type.Number()),
-        exclusiveMinimum: Type.Optional(Type.Boolean()),
-        maxLength: Type.Optional(Type.Integer()),
-        minLength: Type.Optional(Type.Integer()),
-        pattern: Type.Optional(Type.String()),
-        maxItems: Type.Optional(Type.Integer()),
-        minItems: Type.Optional(Type.Integer()),
-        uniqueItems: Type.Optional(Type.Boolean()),
-        maxProperties: Type.Optional(Type.Integer()),
-        minProperties: Type.Optional(Type.Integer()),
-        required: Type.Optional(Type.Array(Type.String())),
-        enum: Type.Optional(Type.Array(Type.Unknown())),
+        title: z.string().optional(),
+        multipleOf: z.number().optional(),
+        maximum: z.number().optional(),
+        exclusiveMaximum: z.boolean().optional(),
+        minimum: z.number().optional(),
+        exclusiveMinimum: z.boolean().optional(),
+        maxLength: z.number().int().optional(),
+        minLength: z.number().int().optional(),
+        pattern: z.string().optional(),
+        maxItems: z.number().int().optional(),
+        minItems: z.number().int().optional(),
+        uniqueItems: z.boolean().optional(),
+        maxProperties: z.number().int().optional(),
+        minProperties: z.number().int().optional(),
+        required: z.array(z.string()).optional(),
+        enum: z.array(z.unknown()).optional(),
 
         // Modified JSON Schema properties - use SchemaOrRef for schema references
-        type: Type.Optional(Type.String()),
-        allOf: Type.Optional(Type.Array(SchemaOrRef)),
-        oneOf: Type.Optional(Type.Array(SchemaOrRef)),
-        anyOf: Type.Optional(Type.Array(SchemaOrRef)),
-        not: Type.Optional(SchemaOrRef),
-        items: Type.Optional(SchemaOrRef),
-        properties: Type.Optional(Type.Record(Type.String(), SchemaOrRef)),
-        additionalProperties: Type.Optional(
-          Type.Union([Type.Boolean(), SchemaOrRef])
-        ),
-        description: Type.Optional(Type.String()),
-        format: Type.Optional(Type.String()),
-        default: Type.Optional(Type.Unknown()),
+        type: z.string().optional(),
+        allOf: z.array(SchemaOrRef).optional(),
+        oneOf: z.array(SchemaOrRef).optional(),
+        anyOf: z.array(SchemaOrRef).optional(),
+        not: SchemaOrRef.optional(),
+        items: SchemaOrRef.optional(),
+        properties: z.record(z.string(), SchemaOrRef).optional(),
+        additionalProperties: z.union([z.boolean(), SchemaOrRef]).optional(),
+        description: z.string().optional(),
+        format: z.string().optional(),
+        default: z.unknown().optional(),
 
         // OpenAPI-specific properties
-        nullable: Type.Optional(Type.Boolean()),
-        discriminator: Type.Optional(Discriminator),
-        readOnly: Type.Optional(Type.Boolean()),
-        writeOnly: Type.Optional(Type.Boolean()),
-        xml: Type.Optional(XML),
-        externalDocs: Type.Optional(ExternalDocumentation),
-        example: Type.Optional(Type.Unknown()),
-        deprecated: Type.Optional(Type.Boolean()),
-      }),
-    },
-    "Schema"
+        nullable: z.boolean().optional(),
+        discriminator: Discriminator.optional(),
+        readOnly: z.boolean().optional(),
+        writeOnly: z.boolean().optional(),
+        xml: XML.optional(),
+        externalDocs: ExternalDocumentation.optional(),
+        example: z.unknown().optional(),
+        deprecated: z.boolean().optional(),
+      })
+      .transform((value) => {
+        setOpenAPITag(value, "Schema");
+        return value;
+      })
   );
 
   // ===========================================================================
@@ -206,149 +246,145 @@ export namespace OpenAPI {
   // ===========================================================================
 
   // Helper to create "Schema | Reference" union for use outside Schema
-  const SchemaOrReference = Type.Union([Schema, Reference]);
-  const ExampleOrReference = Type.Union([Example, Reference]);
+  const SchemaOrReference = z.union([Reference, Schema]);
+  const ExampleOrReference = z.union([Reference, Example]);
 
   // Encoding Object
   export const Encoding = TaggedObject(
-    Type.Object({
-      contentType: Type.Optional(Type.String()),
-      // Note: headers will be defined with HeaderOrReference after Header is defined
-      headers: Type.Optional(
-        Type.Record(Type.String(), Type.Union([Type.Unknown(), Reference]))
-      ),
-      style: Type.Optional(Type.String()),
-      explode: Type.Optional(Type.Boolean()),
-      allowReserved: Type.Optional(Type.Boolean()),
-    }),
+    {
+      contentType: z.string().optional(),
+      // Note: headers will be defined with HeaderOrR/eference after Header is defined
+      headers: z
+        .record(z.string(), z.union([Reference, z.unknown()]))
+        .optional(),
+      style: z.string().optional(),
+      explode: z.boolean().optional(),
+      allowReserved: z.boolean().optional(),
+    },
     "Encoding"
   );
 
   // MediaType Object
   export const MediaType = TaggedObject(
-    Type.Object({
-      schema: Type.Optional(SchemaOrReference),
-      example: Type.Optional(Type.Unknown()),
-      examples: Type.Optional(Type.Record(Type.String(), ExampleOrReference)),
-      encoding: Type.Optional(Type.Record(Type.String(), Encoding)),
-    }),
+    {
+      schema: SchemaOrReference.optional(),
+      example: z.unknown().optional(),
+      examples: z.record(z.string(), ExampleOrReference).optional(),
+      encoding: z.record(z.string(), Encoding).optional(),
+    },
     "MediaType"
   );
 
   // Header Object
   export const Header = TaggedObject(
-    Type.Object({
-      description: Type.Optional(Type.String()),
-      required: Type.Optional(Type.Boolean()),
-      deprecated: Type.Optional(Type.Boolean()),
-      allowEmptyValue: Type.Optional(Type.Boolean()),
-      style: Type.Optional(Type.String()),
-      explode: Type.Optional(Type.Boolean()),
-      allowReserved: Type.Optional(Type.Boolean()),
-      schema: Type.Optional(SchemaOrReference),
-      example: Type.Optional(Type.Unknown()),
-      examples: Type.Optional(Type.Record(Type.String(), ExampleOrReference)),
-      content: Type.Optional(Type.Record(Type.String(), MediaType)),
-    }),
+    {
+      description: z.string().optional(),
+      required: z.boolean().optional(),
+      deprecated: z.boolean().optional(),
+      allowEmptyValue: z.boolean().optional(),
+      style: z.string().optional(),
+      explode: z.boolean().optional(),
+      allowReserved: z.boolean().optional(),
+      schema: SchemaOrReference.optional(),
+      example: z.unknown().optional(),
+      examples: z.record(z.string(), ExampleOrReference).optional(),
+      content: z.record(z.string(), MediaType).optional(),
+    },
     "Header"
   );
 
-  const HeaderOrReference = Type.Union([Header, Reference]);
+  const HeaderOrReference = z.union([Reference, Header]);
 
   // Link Object
   export const Link = TaggedObject(
-    Type.Object({
-      operationRef: Type.Optional(Type.String()),
-      operationId: Type.Optional(Type.String()),
-      parameters: Type.Optional(Type.Record(Type.String(), Type.Unknown())),
-      requestBody: Type.Optional(Type.Unknown()),
-      description: Type.Optional(Type.String()),
-      server: Type.Optional(Server),
-    }),
+    {
+      operationRef: z.string().optional(),
+      operationId: z.string().optional(),
+      parameters: z.record(z.string(), z.unknown()).optional(),
+      requestBody: z.unknown().optional(),
+      description: z.string().optional(),
+      server: Server.optional(),
+    },
     "Link"
   );
 
-  const LinkOrReference = Type.Union([Link, Reference]);
+  const LinkOrReference = z.union([Reference, Link]);
 
   // Response Object
   export const Response = TaggedObject(
-    Type.Object({
-      description: Type.String(),
-      headers: Type.Optional(Type.Record(Type.String(), HeaderOrReference)),
-      content: Type.Optional(Type.Record(Type.String(), MediaType)),
-      links: Type.Optional(Type.Record(Type.String(), LinkOrReference)),
-    }),
+    {
+      description: z.string(),
+      headers: z.record(z.string(), HeaderOrReference).optional(),
+      content: z.record(z.string(), MediaType).optional(),
+      links: z.record(z.string(), LinkOrReference).optional(),
+    },
     "Response"
   );
 
-  const ResponseOrReference = Type.Union([Response, Reference]);
+  const ResponseOrReference = z.union([Reference, Response]);
 
   // Parameter Object
   export const Parameter = TaggedObject(
-    Type.Object({
-      name: Type.String(),
-      in: Type.Union([
-        Type.Literal("query"),
-        Type.Literal("header"),
-        Type.Literal("path"),
-        Type.Literal("cookie"),
+    {
+      name: z.string(),
+      in: z.union([
+        z.literal("query"),
+        z.literal("header"),
+        z.literal("path"),
+        z.literal("cookie"),
       ]),
-      description: Type.Optional(Type.String()),
-      required: Type.Optional(Type.Boolean()),
-      deprecated: Type.Optional(Type.Boolean()),
-      allowEmptyValue: Type.Optional(Type.Boolean()),
-      style: Type.Optional(Type.String()),
-      explode: Type.Optional(Type.Boolean()),
-      allowReserved: Type.Optional(Type.Boolean()),
-      schema: Type.Optional(SchemaOrReference),
-      example: Type.Optional(Type.Unknown()),
-      examples: Type.Optional(Type.Record(Type.String(), ExampleOrReference)),
-      content: Type.Optional(Type.Record(Type.String(), MediaType)),
-    }),
+      description: z.string().optional(),
+      required: z.boolean().optional(),
+      deprecated: z.boolean().optional(),
+      allowEmptyValue: z.boolean().optional(),
+      style: z.string().optional(),
+      explode: z.boolean().optional(),
+      allowReserved: z.boolean().optional(),
+      schema: SchemaOrReference.optional(),
+      example: z.unknown().optional(),
+      examples: z.record(z.string(), ExampleOrReference).optional(),
+      content: z.record(z.string(), MediaType).optional(),
+    },
     "Parameter"
   );
 
-  const ParameterOrReference = Type.Union([Parameter, Reference]);
+  const ParameterOrReference = z.union([Reference, Parameter]);
 
   // Request Body Object
   export const RequestBody = TaggedObject(
-    Type.Object({
-      description: Type.Optional(Type.String()),
-      content: Type.Record(Type.String(), MediaType),
-      required: Type.Optional(Type.Boolean()),
-    }),
+    {
+      description: z.string().optional(),
+      content: z.record(z.string(), MediaType),
+      required: z.boolean().optional(),
+    },
     "RequestBody"
   );
 
-  const RequestBodyOrReference = Type.Union([RequestBody, Reference]);
+  const RequestBodyOrReference = z.union([Reference, RequestBody]);
 
   // Security Scheme Object
   export const SecurityScheme = TaggedObject(
-    Type.Object({
-      type: Type.Union([
-        Type.Literal("apiKey"),
-        Type.Literal("http"),
-        Type.Literal("oauth2"),
-        Type.Literal("openIdConnect"),
+    {
+      type: z.union([
+        z.literal("apiKey"),
+        z.literal("http"),
+        z.literal("oauth2"),
+        z.literal("openIdConnect"),
       ]),
-      description: Type.Optional(Type.String()),
-      name: Type.Optional(Type.String()),
-      in: Type.Optional(
-        Type.Union([
-          Type.Literal("query"),
-          Type.Literal("header"),
-          Type.Literal("cookie"),
-        ])
-      ),
-      scheme: Type.Optional(Type.String()),
-      bearerFormat: Type.Optional(Type.String()),
-      flows: Type.Optional(OAuthFlows),
-      openIdConnectUrl: Type.Optional(Type.String()),
-    }),
+      description: z.string().optional(),
+      name: z.string().optional(),
+      in: z
+        .union([z.literal("query"), z.literal("header"), z.literal("cookie")])
+        .optional(),
+      scheme: z.string().optional(),
+      bearerFormat: z.string().optional(),
+      flows: OAuthFlows.optional(),
+      openIdConnectUrl: z.string().optional(),
+    },
     "SecurityScheme"
   );
 
-  const SecuritySchemeOrReference = Type.Union([SecurityScheme, Reference]);
+  const SecuritySchemeOrReference = z.union([Reference, SecurityScheme]);
 
   // ===========================================================================
   // Layer 5: Operation-level types
@@ -356,49 +392,49 @@ export namespace OpenAPI {
 
   // Operation Object
   export const Operation = TaggedObject(
-    Type.Object({
-      tags: Type.Optional(Type.Array(Type.String())),
-      summary: Type.Optional(Type.String()),
-      description: Type.Optional(Type.String()),
-      externalDocs: Type.Optional(ExternalDocumentation),
-      operationId: Type.Optional(Type.String()),
-      parameters: Type.Optional(Type.Array(ParameterOrReference)),
-      requestBody: Type.Optional(RequestBodyOrReference),
-      responses: Type.Record(Type.String(), ResponseOrReference),
+    {
+      tags: z.array(z.string()).optional(),
+      summary: z.string().optional(),
+      description: z.string().optional(),
+      externalDocs: ExternalDocumentation.optional(),
+      operationId: z.string().optional(),
+      parameters: z.array(ParameterOrReference).optional(),
+      requestBody: RequestBodyOrReference.optional(),
+      responses: z.record(z.string(), ResponseOrReference),
       // callbacks defined below after PathItem
-      callbacks: Type.Optional(Type.Record(Type.String(), Type.Unknown())),
-      deprecated: Type.Optional(Type.Boolean()),
-      security: Type.Optional(Type.Array(SecurityRequirement)),
-      servers: Type.Optional(Type.Array(Server)),
-    }),
+      callbacks: z.record(z.string(), z.unknown()).optional(),
+      deprecated: z.boolean().optional(),
+      security: z.array(SecurityRequirement).optional(),
+      servers: z.array(Server).optional(),
+    },
     "Operation"
   );
 
   // Path Item Object
   export const PathItem = TaggedObject(
-    Type.Object({
-      summary: Type.Optional(Type.String()),
-      description: Type.Optional(Type.String()),
-      get: Type.Optional(Operation),
-      put: Type.Optional(Operation),
-      post: Type.Optional(Operation),
-      delete: Type.Optional(Operation),
-      options: Type.Optional(Operation),
-      head: Type.Optional(Operation),
-      patch: Type.Optional(Operation),
-      trace: Type.Optional(Operation),
-      servers: Type.Optional(Type.Array(Server)),
-      parameters: Type.Optional(Type.Array(ParameterOrReference)),
-    }),
+    {
+      summary: z.string().optional(),
+      description: z.string().optional(),
+      get: Operation.optional(),
+      put: Operation.optional(),
+      post: Operation.optional(),
+      delete: Operation.optional(),
+      options: Operation.optional(),
+      head: Operation.optional(),
+      patch: Operation.optional(),
+      trace: Operation.optional(),
+      servers: z.array(Server).optional(),
+      parameters: z.array(ParameterOrReference).optional(),
+    },
     "PathItem"
   );
 
-  const PathItemOrReference = Type.Union([PathItem, Reference]);
+  const PathItemOrReference = z.union([Reference, PathItem]);
 
   // Callback Object
-  export const Callback = Type.Record(Type.String(), PathItemOrReference);
+  export const Callback = z.record(z.string(), PathItemOrReference);
 
-  const CallbackOrReference = Type.Union([Callback, Reference]);
+  const CallbackOrReference = z.union([Reference, Callback]);
 
   // ===========================================================================
   // Layer 6: Components
@@ -406,23 +442,19 @@ export namespace OpenAPI {
 
   // Components Object
   export const Components = TaggedObject(
-    Type.Object({
-      schemas: Type.Optional(Type.Record(Type.String(), SchemaOrReference)),
-      responses: Type.Optional(Type.Record(Type.String(), ResponseOrReference)),
-      parameters: Type.Optional(
-        Type.Record(Type.String(), ParameterOrReference)
-      ),
-      examples: Type.Optional(Type.Record(Type.String(), ExampleOrReference)),
-      requestBodies: Type.Optional(
-        Type.Record(Type.String(), RequestBodyOrReference)
-      ),
-      headers: Type.Optional(Type.Record(Type.String(), HeaderOrReference)),
-      securitySchemes: Type.Optional(
-        Type.Record(Type.String(), SecuritySchemeOrReference)
-      ),
-      links: Type.Optional(Type.Record(Type.String(), LinkOrReference)),
-      callbacks: Type.Optional(Type.Record(Type.String(), CallbackOrReference)),
-    }),
+    {
+      schemas: z.record(z.string(), SchemaOrReference).optional(),
+      responses: z.record(z.string(), ResponseOrReference).optional(),
+      parameters: z.record(z.string(), ParameterOrReference).optional(),
+      examples: z.record(z.string(), ExampleOrReference).optional(),
+      requestBodies: z.record(z.string(), RequestBodyOrReference).optional(),
+      headers: z.record(z.string(), HeaderOrReference).optional(),
+      securitySchemes: z
+        .record(z.string(), SecuritySchemeOrReference)
+        .optional(),
+      links: z.record(z.string(), LinkOrReference).optional(),
+      callbacks: z.record(z.string(), CallbackOrReference).optional(),
+    },
     "Components"
   );
 
@@ -432,73 +464,73 @@ export namespace OpenAPI {
 
   // Tag Object
   export const Tag = TaggedObject(
-    Type.Object({
-      name: Type.String(),
-      description: Type.Optional(Type.String()),
-      externalDocs: Type.Optional(ExternalDocumentation),
-    }),
+    {
+      name: z.string(),
+      description: z.string().optional(),
+      externalDocs: ExternalDocumentation.optional(),
+    },
     "Tag"
   );
 
   // Info Object
   export const Info = TaggedObject(
-    Type.Object({
-      title: Type.String(),
-      description: Type.Optional(Type.String()),
-      termsOfService: Type.Optional(Type.String()),
-      contact: Type.Optional(Contact),
-      license: Type.Optional(License),
-      version: Type.String(),
-    }),
+    {
+      title: z.string(),
+      description: z.string().optional(),
+      termsOfService: z.string().optional(),
+      contact: Contact.optional(),
+      license: License.optional(),
+      version: z.string(),
+    },
     "Info"
   );
 
   // OpenAPI Document Object
   export const Document = TaggedObject(
-    Type.Object({
-      openapi: Type.String(),
+    {
+      openapi: z.string(),
       info: Info,
-      servers: Type.Optional(Type.Array(Server)),
-      paths: Type.Optional(Type.Record(Type.String(), PathItemOrReference)),
-      components: Type.Optional(Components),
-      security: Type.Optional(Type.Array(SecurityRequirement)),
-      tags: Type.Optional(Type.Array(Tag)),
-      externalDocs: Type.Optional(ExternalDocumentation),
-    }),
+      servers: z.array(Server).optional(),
+      paths: z.record(z.string(), PathItemOrReference).optional(),
+      components: Components.optional(),
+      security: z.array(SecurityRequirement).optional(),
+      tags: z.array(Tag).optional(),
+      externalDocs: ExternalDocumentation.optional(),
+    },
     "Document"
   );
 
   // ===========================================================================
   // Type exports
   // ===========================================================================
-  export type Reference = Type.Static<typeof Reference>;
-  export type ExternalDocumentation = Type.Static<typeof ExternalDocumentation>;
-  export type XML = Type.Static<typeof XML>;
-  export type Discriminator = Type.Static<typeof Discriminator>;
-  export type Schema = Type.Static<typeof Schema>;
-  export type MediaType = Type.Static<typeof MediaType>;
-  export type Example = Type.Static<typeof Example>;
-  export type Encoding = Type.Static<typeof Encoding>;
-  export type Header = Type.Static<typeof Header>;
-  export type Link = Type.Static<typeof Link>;
-  export type Server = Type.Static<typeof Server>;
-  export type ServerVariable = Type.Static<typeof ServerVariable>;
-  export type Response = Type.Static<typeof Response>;
-  export type Parameter = Type.Static<typeof Parameter>;
-  export type RequestBody = Type.Static<typeof RequestBody>;
-  export type Callback = Type.Static<typeof Callback>;
-  export type SecurityRequirement = Type.Static<typeof SecurityRequirement>;
-  export type Operation = Type.Static<typeof Operation>;
-  export type PathItem = Type.Static<typeof PathItem>;
-  export type SecurityScheme = Type.Static<typeof SecurityScheme>;
-  export type OAuthFlows = Type.Static<typeof OAuthFlows>;
-  export type OAuthFlow = Type.Static<typeof OAuthFlow>;
-  export type Components = Type.Static<typeof Components>;
-  export type Tag = Type.Static<typeof Tag>;
-  export type Contact = Type.Static<typeof Contact>;
-  export type License = Type.Static<typeof License>;
-  export type Info = Type.Static<typeof Info>;
-  export type Document = Type.Static<typeof Document>;
+  export type Reference = z.infer<typeof Reference>;
+  export type ExternalDocumentation = z.infer<typeof ExternalDocumentation>;
+  export type XML = z.infer<typeof XML>;
+  export type Discriminator = z.infer<typeof Discriminator>;
+  export type Schema = z.infer<typeof Schema>;
+  export type MediaType = z.infer<typeof MediaType>;
+  export type Example = z.infer<typeof Example>;
+  export type Encoding = z.infer<typeof Encoding>;
+  export type Header = z.infer<typeof Header>;
+  export type Link = z.infer<typeof Link>;
+  export type Server = z.infer<typeof Server>;
+  export type ServerVariable = z.infer<typeof ServerVariable>;
+  export type Response = z.infer<typeof Response>;
+  export type Parameter = z.infer<typeof Parameter>;
+  export type RequestBody = z.infer<typeof RequestBody>;
+  export type Callback = z.infer<typeof Callback>;
+  export type SecurityRequirement = z.infer<typeof SecurityRequirement>;
+  export type Operation = z.infer<typeof Operation>;
+  export type PathItem = z.infer<typeof PathItem>;
+  export type SecurityScheme = z.infer<typeof SecurityScheme>;
+  export type OAuthFlows = z.infer<typeof OAuthFlows>;
+  export type OAuthFlow = z.infer<typeof OAuthFlow>;
+  export type Components = z.infer<typeof Components>;
+  export type Tag = z.infer<typeof Tag>;
+  export type Contact = z.infer<typeof Contact>;
+  export type License = z.infer<typeof License>;
+  export type Info = z.infer<typeof Info>;
+  export type Document = z.infer<typeof Document>;
 }
 
-export type JSONPointer = string & { __jsonPointer?: true };
+export type JSONPointerZod = string & { __jsonPointer?: true };

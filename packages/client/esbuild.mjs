@@ -4,7 +4,7 @@ const isWatch = process.argv.includes("--watch");
 
 /** @type {esbuild.BuildOptions} */
 const clientConfig = {
-  entryPoints: ["./out/extension.js"],
+  entryPoints: ["./src/extension.ts"],
   bundle: true,
   outfile: "./dist/extension.js",
   platform: "node",
@@ -15,7 +15,7 @@ const clientConfig = {
 
 /** @type {esbuild.BuildOptions} */
 const serverConfig = {
-  entryPoints: ["../server/out/src/server.js"],
+  entryPoints: ["../server/src/server.ts"],
   bundle: true,
   outfile: "./dist/server.js",
   platform: "node",

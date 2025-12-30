@@ -51,11 +51,10 @@
     ]
   },
   "scripts": {
-    "build": "tsc -b",
-    "watch": "tsc -b -w",
     "bundle": "node esbuild.mjs",
-    "clean": "rm -rf out dist *.tsbuildinfo",
-    "package": "pnpm build && pnpm bundle && vsce package --no-dependencies",
+    "watch": "node esbuild.mjs --watch",
+    "clean": "rm -rf dist *.tsbuildinfo",
+    "package": "pnpm bundle && vsce package --no-dependencies",
     "test": "echo \"No tests yet\""
   },
   "dependencies": {
@@ -64,7 +63,7 @@
   "devDependencies": {
     "@types/vscode": "^1.85.0",
     "@vscode/vsce": "^3.2.1",
-    "esbuild": "^0.24.0",
+    "esbuild": "catalog:",
     "typescript": "catalog:"
   }
 }

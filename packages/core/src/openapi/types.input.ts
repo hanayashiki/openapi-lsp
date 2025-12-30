@@ -1,31 +1,18 @@
 /**
  * Lenient input types matching OpenAPI 3.0.3 specification
+ * Uses Zod .catch() for fallback defaults on invalid input
  */
 
-import Type from "typebox";
-import {
-  FallbackString,
-  FallbackOptionalString,
-  FallbackOptionalNumber,
-  FallbackOptionalInteger,
-  FallbackOptionalBoolean,
-  FallbackLiteralUnion,
-  FallbackOptionalLiteralUnion,
-  FallbackArray,
-  FallbackOptionalArray,
-  FallbackRecord,
-  FallbackOptionalRecord,
-  FallbackObject,
-  FallbackOptionalObject,
-  FallbackOptionalBooleanOrSchema,
-} from "./input-codec.js";
+import { z } from "zod";
+import { setOpenAPITag } from "./tag.js";
 
 // ------------------------------------------------------------------------------
 // OpenAPI Namespace
 //
-// Strict types matching OpenAPI 3.0.3 specification
-// Uses Type.Cyclic only for Schema (the only truly recursive type)
+// Lenient types matching OpenAPI 3.0.3 specification
+// Uses z.lazy() only for Schema (the only truly recursive type)
 // All other types use direct references
+// Uses .catch() for lenient parsing with fallback defaults
 // ------------------------------------------------------------------------------
 export namespace OpenAPIInput {
   // ===========================================================================
@@ -33,396 +20,479 @@ export namespace OpenAPIInput {
   // ===========================================================================
 
   // Reference Object - used at use sites for referenceable types
-  export const Reference = FallbackObject(Type.Object({
-    // TODO: mark this as JSONPointer
-    $ref: FallbackString(""),
-  }));
+  export const Reference = z
+    .object({
+      $ref: z.string().catch(""),
+    })
+    .catch({ $ref: "" });
 
   // XML Object
-  export const XML = FallbackObject(Type.Object({
-    name: FallbackOptionalString(),
-    namespace: FallbackOptionalString(),
-    prefix: FallbackOptionalString(),
-    attribute: FallbackOptionalBoolean(),
-    wrapped: FallbackOptionalBoolean(),
-  }));
+  export const XML = z
+    .object({
+      name: z.string().optional().catch(undefined),
+      namespace: z.string().optional().catch(undefined),
+      prefix: z.string().optional().catch(undefined),
+      attribute: z.boolean().optional().catch(undefined),
+      wrapped: z.boolean().optional().catch(undefined),
+    })
+    .catch({});
 
   // Discriminator Object
-  export const Discriminator = FallbackObject(Type.Object({
-    propertyName: FallbackString(""),
-    mapping: FallbackOptionalRecord(Type.String(), FallbackString("")),
-  }));
+  export const Discriminator = z
+    .object({
+      propertyName: z.string().catch(""),
+      mapping: z.record(z.string(), z.string().catch("")).optional().catch(undefined),
+    })
+    .catch({ propertyName: "" });
 
   // Contact Object
-  export const Contact = FallbackObject(Type.Object({
-    name: FallbackOptionalString(),
-    url: FallbackOptionalString(),
-    email: FallbackOptionalString(),
-  }));
+  export const Contact = z
+    .object({
+      name: z.string().optional().catch(undefined),
+      url: z.string().optional().catch(undefined),
+      email: z.string().optional().catch(undefined),
+    })
+    .catch({});
 
   // License Object
-  export const License = FallbackObject(Type.Object({
-    name: FallbackString(""),
-    url: FallbackOptionalString(),
-  }));
+  export const License = z
+    .object({
+      name: z.string().catch(""),
+      url: z.string().optional().catch(undefined),
+    })
+    .catch({ name: "" });
 
   // Server Variable Object
-  export const ServerVariable = FallbackObject(Type.Object({
-    enum: FallbackOptionalArray(FallbackString("")),
-    default: FallbackString(""),
-    description: FallbackOptionalString(),
-  }));
+  export const ServerVariable = z
+    .object({
+      enum: z.array(z.string().catch("")).optional().catch(undefined),
+      default: z.string().catch(""),
+      description: z.string().optional().catch(undefined),
+    })
+    .catch({ default: "" });
 
   // OAuth Flow Object
-  export const OAuthFlow = FallbackObject(Type.Object({
-    authorizationUrl: FallbackOptionalString(),
-    tokenUrl: FallbackOptionalString(),
-    refreshUrl: FallbackOptionalString(),
-    scopes: FallbackRecord(Type.String(), FallbackString("")),
-  }));
+  export const OAuthFlow = z
+    .object({
+      authorizationUrl: z.string().optional().catch(undefined),
+      tokenUrl: z.string().optional().catch(undefined),
+      refreshUrl: z.string().optional().catch(undefined),
+      scopes: z.record(z.string(), z.string().catch("")).catch({}),
+    })
+    .catch({ scopes: {} });
 
   // Example Object
-  export const Example = FallbackObject(Type.Object({
-    summary: FallbackOptionalString(),
-    description: FallbackOptionalString(),
-    value: Type.Optional(Type.Unknown()),
-    externalValue: FallbackOptionalString(),
-  }));
+  export const Example = z
+    .object({
+      summary: z.string().optional().catch(undefined),
+      description: z.string().optional().catch(undefined),
+      value: z.unknown().optional(),
+      externalValue: z.string().optional().catch(undefined),
+    })
+    .catch({});
 
   // Security Requirement Object
-  export const SecurityRequirement = FallbackRecord(
-    Type.String(),
-    FallbackArray(FallbackString(""))
-  );
+  export const SecurityRequirement = z
+    .record(z.string(), z.array(z.string().catch("")).catch([]))
+    .catch({});
 
   // ===========================================================================
   // Layer 2: Simple composed types
   // ===========================================================================
 
   // External Documentation Object
-  export const ExternalDocumentation = FallbackObject(Type.Object({
-    description: FallbackOptionalString(),
-    url: FallbackString(""),
-  }));
+  export const ExternalDocumentation = z
+    .object({
+      description: z.string().optional().catch(undefined),
+      url: z.string().catch(""),
+    })
+    .catch({ url: "" });
 
   // OAuth Flows Object
-  export const OAuthFlows = FallbackObject(Type.Object({
-    implicit: Type.Optional(OAuthFlow),
-    password: Type.Optional(OAuthFlow),
-    clientCredentials: Type.Optional(OAuthFlow),
-    authorizationCode: Type.Optional(OAuthFlow),
-  }));
+  export const OAuthFlows = z
+    .object({
+      implicit: OAuthFlow.optional().catch(undefined),
+      password: OAuthFlow.optional().catch(undefined),
+      clientCredentials: OAuthFlow.optional().catch(undefined),
+      authorizationCode: OAuthFlow.optional().catch(undefined),
+    })
+    .catch({});
 
   // Server Object
-  export const Server = FallbackObject(Type.Object({
-    url: FallbackString(""),
-    description: FallbackOptionalString(),
-    variables: FallbackOptionalRecord(Type.String(), ServerVariable),
-  }));
+  export const Server = z
+    .object({
+      url: z.string().catch(""),
+      description: z.string().optional().catch(undefined),
+      variables: z.record(z.string(), ServerVariable).optional().catch(undefined),
+    })
+    .catch({ url: "" });
 
   // ===========================================================================
-  // Layer 3: Schema (recursive - uses Type.Cyclic)
+  // Layer 3: Schema (recursive - uses z.lazy)
   // ===========================================================================
 
-  // Helper to create "Schema | Reference" union for use inside Schema
-  const SchemaOrRef = Type.Union([Type.Ref("Schema"), Reference]);
+  // Define the Schema type for self-reference
+  type SchemaType = {
+    title?: string;
+    multipleOf?: number;
+    maximum?: number;
+    exclusiveMaximum?: boolean;
+    minimum?: number;
+    exclusiveMinimum?: boolean;
+    maxLength?: number;
+    minLength?: number;
+    pattern?: string;
+    maxItems?: number;
+    minItems?: number;
+    uniqueItems?: boolean;
+    maxProperties?: number;
+    minProperties?: number;
+    required?: string[];
+    enum?: unknown[];
+    type?: string;
+    allOf?: (SchemaType | Reference)[];
+    oneOf?: (SchemaType | Reference)[];
+    anyOf?: (SchemaType | Reference)[];
+    not?: SchemaType | Reference;
+    items?: SchemaType | Reference;
+    properties?: Record<string, SchemaType | Reference>;
+    additionalProperties?: boolean | SchemaType | Reference;
+    description?: string;
+    format?: string;
+    default?: unknown;
+    nullable?: boolean;
+    discriminator?: z.infer<typeof Discriminator>;
+    readOnly?: boolean;
+    writeOnly?: boolean;
+    xml?: z.infer<typeof XML>;
+    externalDocs?: z.infer<typeof ExternalDocumentation>;
+    example?: unknown;
+    deprecated?: boolean;
+  };
 
-  export const Schema = Type.Cyclic(
-    {
-      Schema: Type.Object({
+  // Helper to create "Reference | Schema" union for use inside Schema
+  const SchemaOrRef: z.ZodType<SchemaType | Reference> = z.lazy(() =>
+    z.union([Reference, Schema])
+  );
+
+  export const Schema: z.ZodType<SchemaType> = z.lazy(() =>
+    z
+      .object({
         // JSON Schema properties
-        title: FallbackOptionalString(),
-        multipleOf: FallbackOptionalNumber(),
-        maximum: FallbackOptionalNumber(),
-        exclusiveMaximum: FallbackOptionalBoolean(),
-        minimum: FallbackOptionalNumber(),
-        exclusiveMinimum: FallbackOptionalBoolean(),
-        maxLength: FallbackOptionalInteger(),
-        minLength: FallbackOptionalInteger(),
-        pattern: FallbackOptionalString(),
-        maxItems: FallbackOptionalInteger(),
-        minItems: FallbackOptionalInteger(),
-        uniqueItems: FallbackOptionalBoolean(),
-        maxProperties: FallbackOptionalInteger(),
-        minProperties: FallbackOptionalInteger(),
-        required: FallbackOptionalArray(FallbackString("")),
-        enum: Type.Optional(Type.Array(Type.Unknown())),
+        title: z.string().optional().catch(undefined),
+        multipleOf: z.number().optional().catch(undefined),
+        maximum: z.number().optional().catch(undefined),
+        exclusiveMaximum: z.boolean().optional().catch(undefined),
+        minimum: z.number().optional().catch(undefined),
+        exclusiveMinimum: z.boolean().optional().catch(undefined),
+        maxLength: z.number().int().optional().catch(undefined),
+        minLength: z.number().int().optional().catch(undefined),
+        pattern: z.string().optional().catch(undefined),
+        maxItems: z.number().int().optional().catch(undefined),
+        minItems: z.number().int().optional().catch(undefined),
+        uniqueItems: z.boolean().optional().catch(undefined),
+        maxProperties: z.number().int().optional().catch(undefined),
+        minProperties: z.number().int().optional().catch(undefined),
+        required: z.array(z.string().catch("")).optional().catch(undefined),
+        enum: z.array(z.unknown()).optional(),
 
-        // Modified JSON Schema properties - use SchemaOrRef for schema references
-        type: FallbackOptionalString(),
-        allOf: FallbackOptionalArray(SchemaOrRef),
-        oneOf: FallbackOptionalArray(SchemaOrRef),
-        anyOf: FallbackOptionalArray(SchemaOrRef),
-        not: Type.Optional(SchemaOrRef),
-        items: Type.Optional(SchemaOrRef),
-        properties: FallbackOptionalRecord(Type.String(), SchemaOrRef),
-        additionalProperties: FallbackOptionalBooleanOrSchema(SchemaOrRef),
-        description: FallbackOptionalString(),
-        format: FallbackOptionalString(),
-        default: Type.Optional(Type.Unknown()),
+        // Modified JSON Schema properties
+        type: z.string().optional().catch(undefined),
+        allOf: z.array(SchemaOrRef).optional().catch(undefined),
+        oneOf: z.array(SchemaOrRef).optional().catch(undefined),
+        anyOf: z.array(SchemaOrRef).optional().catch(undefined),
+        not: SchemaOrRef.optional().catch(undefined),
+        items: SchemaOrRef.optional().catch(undefined),
+        properties: z.record(z.string(), SchemaOrRef).optional().catch(undefined),
+        additionalProperties: z
+          .union([z.boolean(), SchemaOrRef])
+          .optional()
+          .catch(undefined),
+        description: z.string().optional().catch(undefined),
+        format: z.string().optional().catch(undefined),
+        default: z.unknown().optional(),
 
         // OpenAPI-specific properties
-        nullable: FallbackOptionalBoolean(),
-        discriminator: Type.Optional(Discriminator),
-        readOnly: FallbackOptionalBoolean(),
-        writeOnly: FallbackOptionalBoolean(),
-        xml: Type.Optional(XML),
-        externalDocs: Type.Optional(ExternalDocumentation),
-        example: Type.Optional(Type.Unknown()),
-        deprecated: FallbackOptionalBoolean(),
-      }),
-    },
-    "Schema"
+        nullable: z.boolean().optional().catch(undefined),
+        discriminator: Discriminator.optional().catch(undefined),
+        readOnly: z.boolean().optional().catch(undefined),
+        writeOnly: z.boolean().optional().catch(undefined),
+        xml: XML.optional().catch(undefined),
+        externalDocs: ExternalDocumentation.optional().catch(undefined),
+        example: z.unknown().optional(),
+        deprecated: z.boolean().optional().catch(undefined),
+      })
+      .transform((value) => {
+        setOpenAPITag(value, "Schema");
+        return value;
+      })
   );
 
   // ===========================================================================
   // Layer 4: Schema-dependent types
   // ===========================================================================
 
-  // Helper to create "Schema | Reference" union for use outside Schema
-  const SchemaOrReference = Type.Union([Schema, Reference]);
-  const ExampleOrReference = Type.Union([Example, Reference]);
+  // Helper to create "Reference | Schema" union for use outside Schema
+  const SchemaOrReference = z.union([Reference, Schema]);
+  const ExampleOrReference = z.union([Reference, Example]);
 
   // Encoding Object
-  export const Encoding = FallbackObject(Type.Object({
-    contentType: FallbackOptionalString(),
-    // Note: headers will be defined with HeaderOrReference after Header is defined
-    headers: FallbackOptionalRecord(
-      Type.String(),
-      Type.Union([Type.Unknown(), Reference])
-    ),
-    style: FallbackOptionalString(),
-    explode: FallbackOptionalBoolean(),
-    allowReserved: FallbackOptionalBoolean(),
-  }));
+  export const Encoding = z
+    .object({
+      contentType: z.string().optional().catch(undefined),
+      headers: z
+        .record(z.string(), z.union([Reference, z.unknown()]))
+        .optional()
+        .catch(undefined),
+      style: z.string().optional().catch(undefined),
+      explode: z.boolean().optional().catch(undefined),
+      allowReserved: z.boolean().optional().catch(undefined),
+    })
+    .catch({});
 
   // MediaType Object
-  export const MediaType = FallbackObject(Type.Object({
-    schema: Type.Optional(SchemaOrReference),
-    example: Type.Optional(Type.Unknown()),
-    examples: FallbackOptionalRecord(Type.String(), ExampleOrReference),
-    encoding: FallbackOptionalRecord(Type.String(), Encoding),
-  }));
+  export const MediaType = z
+    .object({
+      schema: SchemaOrReference.optional().catch(undefined),
+      example: z.unknown().optional(),
+      examples: z.record(z.string(), ExampleOrReference).optional().catch(undefined),
+      encoding: z.record(z.string(), Encoding).optional().catch(undefined),
+    })
+    .catch({});
 
   // Header Object
-  export const Header = FallbackObject(Type.Object({
-    description: FallbackOptionalString(),
-    required: FallbackOptionalBoolean(),
-    deprecated: FallbackOptionalBoolean(),
-    allowEmptyValue: FallbackOptionalBoolean(),
-    style: FallbackOptionalString(),
-    explode: FallbackOptionalBoolean(),
-    allowReserved: FallbackOptionalBoolean(),
-    schema: Type.Optional(SchemaOrReference),
-    example: Type.Optional(Type.Unknown()),
-    examples: FallbackOptionalRecord(Type.String(), ExampleOrReference),
-    content: FallbackOptionalRecord(Type.String(), MediaType),
-  }));
+  export const Header = z
+    .object({
+      description: z.string().optional().catch(undefined),
+      required: z.boolean().optional().catch(undefined),
+      deprecated: z.boolean().optional().catch(undefined),
+      allowEmptyValue: z.boolean().optional().catch(undefined),
+      style: z.string().optional().catch(undefined),
+      explode: z.boolean().optional().catch(undefined),
+      allowReserved: z.boolean().optional().catch(undefined),
+      schema: SchemaOrReference.optional().catch(undefined),
+      example: z.unknown().optional(),
+      examples: z.record(z.string(), ExampleOrReference).optional().catch(undefined),
+      content: z.record(z.string(), MediaType).optional().catch(undefined),
+    })
+    .catch({});
 
-  const HeaderOrReference = Type.Union([Header, Reference]);
+  const HeaderOrReference = z.union([Reference, Header]);
 
   // Link Object
-  export const Link = FallbackObject(Type.Object({
-    operationRef: FallbackOptionalString(),
-    operationId: FallbackOptionalString(),
-    parameters: FallbackOptionalRecord(Type.String(), Type.Unknown()),
-    requestBody: Type.Optional(Type.Unknown()),
-    description: FallbackOptionalString(),
-    server: Type.Optional(Server),
-  }));
+  export const Link = z
+    .object({
+      operationRef: z.string().optional().catch(undefined),
+      operationId: z.string().optional().catch(undefined),
+      parameters: z.record(z.string(), z.unknown()).optional().catch(undefined),
+      requestBody: z.unknown().optional(),
+      description: z.string().optional().catch(undefined),
+      server: Server.optional().catch(undefined),
+    })
+    .catch({});
 
-  const LinkOrReference = Type.Union([Link, Reference]);
+  const LinkOrReference = z.union([Reference, Link]);
 
   // Response Object
-  export const Response = FallbackObject(Type.Object({
-    description: FallbackString(""),
-    headers: FallbackOptionalRecord(Type.String(), HeaderOrReference),
-    content: FallbackOptionalRecord(Type.String(), MediaType),
-    links: FallbackOptionalRecord(Type.String(), LinkOrReference),
-  }));
+  export const Response = z
+    .object({
+      description: z.string().catch(""),
+      headers: z.record(z.string(), HeaderOrReference).optional().catch(undefined),
+      content: z.record(z.string(), MediaType).optional().catch(undefined),
+      links: z.record(z.string(), LinkOrReference).optional().catch(undefined),
+    })
+    .catch({ description: "" });
 
-  const ResponseOrReference = Type.Union([Response, Reference]);
+  const ResponseOrReference = z.union([Reference, Response]);
 
   // Parameter Object
-  export const Parameter = FallbackObject(Type.Object({
-    name: FallbackString(""),
-    in: FallbackLiteralUnion(["query", "header", "path", "cookie"] as const),
-    description: FallbackOptionalString(),
-    required: FallbackOptionalBoolean(),
-    deprecated: FallbackOptionalBoolean(),
-    allowEmptyValue: FallbackOptionalBoolean(),
-    style: FallbackOptionalString(),
-    explode: FallbackOptionalBoolean(),
-    allowReserved: FallbackOptionalBoolean(),
-    schema: Type.Optional(SchemaOrReference),
-    example: Type.Optional(Type.Unknown()),
-    examples: FallbackOptionalRecord(Type.String(), ExampleOrReference),
-    content: FallbackOptionalRecord(Type.String(), MediaType),
-  }));
+  export const Parameter = z
+    .object({
+      name: z.string().catch(""),
+      in: z.enum(["query", "header", "path", "cookie"]).catch("query"),
+      description: z.string().optional().catch(undefined),
+      required: z.boolean().optional().catch(undefined),
+      deprecated: z.boolean().optional().catch(undefined),
+      allowEmptyValue: z.boolean().optional().catch(undefined),
+      style: z.string().optional().catch(undefined),
+      explode: z.boolean().optional().catch(undefined),
+      allowReserved: z.boolean().optional().catch(undefined),
+      schema: SchemaOrReference.optional().catch(undefined),
+      example: z.unknown().optional(),
+      examples: z.record(z.string(), ExampleOrReference).optional().catch(undefined),
+      content: z.record(z.string(), MediaType).optional().catch(undefined),
+    })
+    .catch({ name: "", in: "query" });
 
-  const ParameterOrReference = Type.Union([Parameter, Reference]);
+  const ParameterOrReference = z.union([Reference, Parameter]);
 
   // Request Body Object
-  export const RequestBody = FallbackObject(Type.Object({
-    description: FallbackOptionalString(),
-    content: FallbackRecord(Type.String(), MediaType),
-    required: FallbackOptionalBoolean(),
-  }));
+  export const RequestBody = z
+    .object({
+      description: z.string().optional().catch(undefined),
+      content: z.record(z.string(), MediaType).catch({}),
+      required: z.boolean().optional().catch(undefined),
+    })
+    .catch({ content: {} });
 
-  const RequestBodyOrReference = Type.Union([RequestBody, Reference]);
+  const RequestBodyOrReference = z.union([Reference, RequestBody]);
 
   // Security Scheme Object
-  export const SecurityScheme = FallbackObject(Type.Object({
-    type: FallbackLiteralUnion([
-      "apiKey",
-      "http",
-      "oauth2",
-      "openIdConnect",
-    ] as const),
-    description: FallbackOptionalString(),
-    name: FallbackOptionalString(),
-    in: FallbackOptionalLiteralUnion([
-      "query",
-      "header",
-      "cookie",
-    ] as const),
-    scheme: FallbackOptionalString(),
-    bearerFormat: FallbackOptionalString(),
-    flows: Type.Optional(OAuthFlows),
-    openIdConnectUrl: FallbackOptionalString(),
-  }));
+  export const SecurityScheme = z
+    .object({
+      type: z.enum(["apiKey", "http", "oauth2", "openIdConnect"]).catch("apiKey"),
+      description: z.string().optional().catch(undefined),
+      name: z.string().optional().catch(undefined),
+      in: z.enum(["query", "header", "cookie"]).optional().catch(undefined),
+      scheme: z.string().optional().catch(undefined),
+      bearerFormat: z.string().optional().catch(undefined),
+      flows: OAuthFlows.optional().catch(undefined),
+      openIdConnectUrl: z.string().optional().catch(undefined),
+    })
+    .catch({ type: "apiKey" });
 
-  const SecuritySchemeOrReference = Type.Union([SecurityScheme, Reference]);
+  const SecuritySchemeOrReference = z.union([Reference, SecurityScheme]);
 
   // ===========================================================================
   // Layer 5: Operation-level types
   // ===========================================================================
 
-  // Operation Object (forward declaration for PathItem)
-  export const Operation = FallbackObject(Type.Object({
-    tags: FallbackOptionalArray(FallbackString("")),
-    summary: FallbackOptionalString(),
-    description: FallbackOptionalString(),
-    externalDocs: Type.Optional(ExternalDocumentation),
-    operationId: FallbackOptionalString(),
-    parameters: FallbackOptionalArray(ParameterOrReference),
-    requestBody: Type.Optional(RequestBodyOrReference),
-    responses: FallbackRecord(Type.String(), ResponseOrReference),
-    // callbacks defined below after PathItem
-    callbacks: FallbackOptionalRecord(Type.String(), Type.Unknown()),
-    deprecated: FallbackOptionalBoolean(),
-    security: FallbackOptionalArray(SecurityRequirement),
-    servers: FallbackOptionalArray(Server),
-  }));
+  // Operation Object
+  export const Operation = z
+    .object({
+      tags: z.array(z.string().catch("")).optional().catch(undefined),
+      summary: z.string().optional().catch(undefined),
+      description: z.string().optional().catch(undefined),
+      externalDocs: ExternalDocumentation.optional().catch(undefined),
+      operationId: z.string().optional().catch(undefined),
+      parameters: z.array(ParameterOrReference).optional().catch(undefined),
+      requestBody: RequestBodyOrReference.optional().catch(undefined),
+      responses: z.record(z.string(), ResponseOrReference).catch({}),
+      callbacks: z.record(z.string(), z.unknown()).optional().catch(undefined),
+      deprecated: z.boolean().optional().catch(undefined),
+      security: z.array(SecurityRequirement).optional().catch(undefined),
+      servers: z.array(Server).optional().catch(undefined),
+    })
+    .catch({ responses: {} });
 
   // Path Item Object
-  export const PathItem = FallbackObject(Type.Object({
-    summary: FallbackOptionalString(),
-    description: FallbackOptionalString(),
-    get: Type.Optional(Operation),
-    put: Type.Optional(Operation),
-    post: Type.Optional(Operation),
-    delete: Type.Optional(Operation),
-    options: Type.Optional(Operation),
-    head: Type.Optional(Operation),
-    patch: Type.Optional(Operation),
-    trace: Type.Optional(Operation),
-    servers: FallbackOptionalArray(Server),
-    parameters: FallbackOptionalArray(ParameterOrReference),
-  }));
+  export const PathItem = z
+    .object({
+      summary: z.string().optional().catch(undefined),
+      description: z.string().optional().catch(undefined),
+      get: Operation.optional().catch(undefined),
+      put: Operation.optional().catch(undefined),
+      post: Operation.optional().catch(undefined),
+      delete: Operation.optional().catch(undefined),
+      options: Operation.optional().catch(undefined),
+      head: Operation.optional().catch(undefined),
+      patch: Operation.optional().catch(undefined),
+      trace: Operation.optional().catch(undefined),
+      servers: z.array(Server).optional().catch(undefined),
+      parameters: z.array(ParameterOrReference).optional().catch(undefined),
+    })
+    .catch({});
 
-  const PathItemOrReference = Type.Union([PathItem, Reference]);
+  const PathItemOrReference = z.union([Reference, PathItem]);
 
   // Callback Object
-  export const Callback = FallbackRecord(Type.String(), PathItemOrReference);
+  export const Callback = z.record(z.string(), PathItemOrReference).catch({});
 
-  const CallbackOrReference = Type.Union([Callback, Reference]);
+  const CallbackOrReference = z.union([Reference, Callback]);
 
   // ===========================================================================
   // Layer 6: Components
   // ===========================================================================
 
   // Components Object
-  export const Components = FallbackObject(Type.Object({
-    schemas: FallbackOptionalRecord(Type.String(), SchemaOrReference),
-    responses: FallbackOptionalRecord(Type.String(), ResponseOrReference),
-    parameters: FallbackOptionalRecord(Type.String(), ParameterOrReference),
-    examples: FallbackOptionalRecord(Type.String(), ExampleOrReference),
-    requestBodies: FallbackOptionalRecord(
-      Type.String(),
-      RequestBodyOrReference
-    ),
-    headers: FallbackOptionalRecord(Type.String(), HeaderOrReference),
-    securitySchemes: FallbackOptionalRecord(
-      Type.String(),
-      SecuritySchemeOrReference
-    ),
-    links: FallbackOptionalRecord(Type.String(), LinkOrReference),
-    callbacks: FallbackOptionalRecord(Type.String(), CallbackOrReference),
-  }));
+  export const Components = z
+    .object({
+      schemas: z.record(z.string(), SchemaOrReference).optional().catch(undefined),
+      responses: z.record(z.string(), ResponseOrReference).optional().catch(undefined),
+      parameters: z.record(z.string(), ParameterOrReference).optional().catch(undefined),
+      examples: z.record(z.string(), ExampleOrReference).optional().catch(undefined),
+      requestBodies: z
+        .record(z.string(), RequestBodyOrReference)
+        .optional()
+        .catch(undefined),
+      headers: z.record(z.string(), HeaderOrReference).optional().catch(undefined),
+      securitySchemes: z
+        .record(z.string(), SecuritySchemeOrReference)
+        .optional()
+        .catch(undefined),
+      links: z.record(z.string(), LinkOrReference).optional().catch(undefined),
+      callbacks: z.record(z.string(), CallbackOrReference).optional().catch(undefined),
+    })
+    .catch({});
 
   // ===========================================================================
   // Layer 7: Top-level types
   // ===========================================================================
 
   // Tag Object
-  export const Tag = FallbackObject(Type.Object({
-    name: FallbackString(""),
-    description: FallbackOptionalString(),
-    externalDocs: Type.Optional(ExternalDocumentation),
-  }));
+  export const Tag = z
+    .object({
+      name: z.string().catch(""),
+      description: z.string().optional().catch(undefined),
+      externalDocs: ExternalDocumentation.optional().catch(undefined),
+    })
+    .catch({ name: "" });
 
   // Info Object
-  export const Info = FallbackObject(Type.Object({
-    title: FallbackString(""),
-    description: FallbackOptionalString(),
-    termsOfService: FallbackOptionalString(),
-    contact: Type.Optional(Contact),
-    license: Type.Optional(License),
-    version: FallbackString("0.0.0"),
-  }));
+  export const Info = z
+    .object({
+      title: z.string().catch(""),
+      description: z.string().optional().catch(undefined),
+      termsOfService: z.string().optional().catch(undefined),
+      contact: Contact.optional().catch(undefined),
+      license: License.optional().catch(undefined),
+      version: z.string().catch("0.0.0"),
+    })
+    .catch({ title: "", version: "0.0.0" });
 
   // OpenAPI Document Object
-  export const Document = FallbackObject(Type.Object({
-    openapi: FallbackString("3.0.3"),
-    info: Info,
-    servers: FallbackOptionalArray(Server),
-    paths: FallbackOptionalRecord(Type.String(), PathItemOrReference),
-    components: FallbackOptionalObject(Components),
-    security: FallbackOptionalArray(SecurityRequirement),
-    tags: FallbackOptionalArray(Tag),
-    externalDocs: Type.Optional(ExternalDocumentation),
-  }));
+  export const Document = z
+    .object({
+      openapi: z.string().catch("3.0.3"),
+      info: Info,
+      servers: z.array(Server).optional().catch(undefined),
+      paths: z.record(z.string(), PathItemOrReference).optional().catch(undefined),
+      components: Components.optional().catch(undefined),
+      security: z.array(SecurityRequirement).optional().catch(undefined),
+      tags: z.array(Tag).optional().catch(undefined),
+      externalDocs: ExternalDocumentation.optional().catch(undefined),
+    })
+    .catch({ openapi: "3.0.3", info: { title: "", version: "0.0.0" } });
 
   // ===========================================================================
   // Type exports
   // ===========================================================================
-  export type Reference = Type.Static<typeof Reference>;
-  export type ExternalDocumentation = Type.Static<typeof ExternalDocumentation>;
-  export type XML = Type.Static<typeof XML>;
-  export type Discriminator = Type.Static<typeof Discriminator>;
-  export type Schema = Type.Static<typeof Schema>;
-  export type MediaType = Type.Static<typeof MediaType>;
-  export type Example = Type.Static<typeof Example>;
-  export type Encoding = Type.Static<typeof Encoding>;
-  export type Header = Type.Static<typeof Header>;
-  export type Link = Type.Static<typeof Link>;
-  export type Server = Type.Static<typeof Server>;
-  export type ServerVariable = Type.Static<typeof ServerVariable>;
-  export type Response = Type.Static<typeof Response>;
-  export type Parameter = Type.Static<typeof Parameter>;
-  export type RequestBody = Type.Static<typeof RequestBody>;
-  export type Callback = Type.Static<typeof Callback>;
-  export type SecurityRequirement = Type.Static<typeof SecurityRequirement>;
-  export type Operation = Type.Static<typeof Operation>;
-  export type PathItem = Type.Static<typeof PathItem>;
-  export type SecurityScheme = Type.Static<typeof SecurityScheme>;
-  export type OAuthFlows = Type.Static<typeof OAuthFlows>;
-  export type OAuthFlow = Type.Static<typeof OAuthFlow>;
-  export type Components = Type.Static<typeof Components>;
-  export type Tag = Type.Static<typeof Tag>;
-  export type Contact = Type.Static<typeof Contact>;
-  export type License = Type.Static<typeof License>;
-  export type Info = Type.Static<typeof Info>;
-  export type Document = Type.Static<typeof Document>;
+  export type Reference = z.infer<typeof Reference>;
+  export type ExternalDocumentation = z.infer<typeof ExternalDocumentation>;
+  export type XML = z.infer<typeof XML>;
+  export type Discriminator = z.infer<typeof Discriminator>;
+  export type Schema = z.infer<typeof Schema>;
+  export type MediaType = z.infer<typeof MediaType>;
+  export type Example = z.infer<typeof Example>;
+  export type Encoding = z.infer<typeof Encoding>;
+  export type Header = z.infer<typeof Header>;
+  export type Link = z.infer<typeof Link>;
+  export type Server = z.infer<typeof Server>;
+  export type ServerVariable = z.infer<typeof ServerVariable>;
+  export type Response = z.infer<typeof Response>;
+  export type Parameter = z.infer<typeof Parameter>;
+  export type RequestBody = z.infer<typeof RequestBody>;
+  export type Callback = z.infer<typeof Callback>;
+  export type SecurityRequirement = z.infer<typeof SecurityRequirement>;
+  export type Operation = z.infer<typeof Operation>;
+  export type PathItem = z.infer<typeof PathItem>;
+  export type SecurityScheme = z.infer<typeof SecurityScheme>;
+  export type OAuthFlows = z.infer<typeof OAuthFlows>;
+  export type OAuthFlow = z.infer<typeof OAuthFlow>;
+  export type Components = z.infer<typeof Components>;
+  export type Tag = z.infer<typeof Tag>;
+  export type Contact = z.infer<typeof Contact>;
+  export type License = z.infer<typeof License>;
+  export type Info = z.infer<typeof Info>;
+  export type Document = z.infer<typeof Document>;
 }

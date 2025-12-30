@@ -3,20 +3,17 @@
   "version": "0.0.1",
   "description": "OpenAPI Language Server",
   "type": "module",
-  "main": "./out/server.js",
-  "types": "./out/server.d.ts",
+  "main": "./src/server.ts",
   "scripts": {
-    "build": "tsc -b",
-    "watch": "tsc -b -w",
-    "clean": "rm -rf out *.tsbuildinfo",
+    "clean": "rm -rf *.tsbuildinfo",
     "test": "echo \"No tests yet\""
   },
   "dependencies": {
     "@openapi-lsp/core": "workspace:*",
-    "typebox": "^1.0.69",
     "vscode-languageserver": "^9.0.1",
     "vscode-languageserver-textdocument": "^1.0.12",
-    "yaml": "^2.6.1"
+    "yaml": "^2.6.1",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "typescript": "catalog:"
