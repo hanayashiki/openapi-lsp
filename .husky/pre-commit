@@ -1,1 +1,2 @@
-pnpm build
+set -e
+pnpm check

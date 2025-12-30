@@ -11,7 +11,7 @@
   "scripts": {
     "build": "pnpm --filter openapilspclient run bundle",
     "watch": "pnpm --filter openapilspclient run watch",
-    "typecheck": "tsc -b",
+    "check": "pnpm -r check",
     "bundle": "pnpm -r run bundle",
     "lint": "oxlint packages --ignore-pattern '*.d.ts'",
     "lint:fix": "oxlint packages --fix --ignore-pattern '*.d.ts'",

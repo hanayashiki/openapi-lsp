@@ -1,0 +1,44 @@
+openapi: "3.0.3"
+info:
+  title: Multi Media Type Example
+  version: "1.0"
+paths:
+  /users:
+    post:
+      requestBody:
+        $ref: "#/components/requestBodies/CreateUserBody"
+      responses:
+        "200":
+          description: OK
+components:
+  requestBodies:
+    CreateUserBody:
+      description: User creation payload with multiple content types
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              name:
+                type: string
+              email:
+                type: string
+                format: email
+        application/xml:
+          schema:
+            type: object
+            properties:
+              name:
+                type: string
+              email:
+                type: string
+        multipart/form-data:
+          schema:
+            type: object
+            properties:
+              name:
+                type: string
+              avatar:
+                type: string
+                format: binary

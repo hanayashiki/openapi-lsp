@@ -11,7 +11,8 @@
   },
   "scripts": {
     "test": "vitest run",
-    "clean": "rm -rf *.tsbuildinfo"
+    "clean": "rm -rf *.tsbuildinfo",
+    "check": "tsc"
   },
   "dependencies": {
     "js-md5": "^0.8.3",

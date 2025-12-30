@@ -10,18 +10,16 @@ export interface Analysis {
 }
 
 export type DefinitionComponent =
-  | { kind: "schema"; value: OpenAPI.Schema | OpenAPI.Reference }
-  | { kind: "response"; value: OpenAPI.Response | OpenAPI.Reference }
-  | { kind: "parameter"; value: OpenAPI.Parameter | OpenAPI.Reference }
-  | { kind: "example"; value: OpenAPI.Example | OpenAPI.Reference }
-  | { kind: "requestBody"; value: OpenAPI.RequestBody | OpenAPI.Reference }
-  | { kind: "header"; value: OpenAPI.Header | OpenAPI.Reference }
-  | {
-      kind: "securityScheme";
-      value: OpenAPI.SecurityScheme | OpenAPI.Reference;
-    }
-  | { kind: "link"; value: OpenAPI.Link | OpenAPI.Reference }
-  | { kind: "callback"; value: OpenAPI.Callback | OpenAPI.Reference };
+  | OpenAPI.Schema
+  | OpenAPI.Response
+  | OpenAPI.Parameter
+  | OpenAPI.Example
+  | OpenAPI.RequestBody
+  | OpenAPI.Header
+  | OpenAPI.SecurityScheme
+  | OpenAPI.Link
+  | OpenAPI.Callback
+  | OpenAPI.Reference;
 
 export type Definition = {
   path: SpecDocumentPath;

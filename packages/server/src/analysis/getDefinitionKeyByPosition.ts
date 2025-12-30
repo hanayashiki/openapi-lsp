@@ -2,7 +2,7 @@ import { Position } from "vscode-languageserver-textdocument";
 import { Analysis, Definition } from "./Analysis.js";
 import { isPositionInRange } from "./utils.js";
 
-export function getComponentKeyByPosition(
+export function getDefinitionKeyByPosition(
   analysis: Analysis,
   position: Position
 ): Definition | null {

@@ -6,6 +6,7 @@
   "main": "./src/server.ts",
   "scripts": {
     "clean": "rm -rf *.tsbuildinfo",
+    "check": "tsc",
     "test": "echo \"No tests yet\""
   },
   "dependencies": {

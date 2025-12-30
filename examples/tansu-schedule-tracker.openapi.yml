@@ -1,0 +1,275 @@
+openapi: 3.0.2
+paths:
+  /vessel-schedules/batch-updates:
+    get:
+      summary: Synchronize vessel schedule in batch
+      tags:
+        - vesselScheduleContract
+      parameters:
+        - name: sinceVersion
+          in: query
+          required: true
+          schema:
+            type: integer
+            nullable: true
+      responses:
+        "200":
+          description: "200"
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    version:
+                      type: integer
+                    carrierCd:
+                      type: string
+                    isReferenceCarrier:
+                      type: boolean
+                    serviceString:
+                      type: string
+                    vessel:
+                      type: string
+                    voyage:
+                      type: string
+                    polCd:
+                      type: string
+                    podCd:
+                      type: string
+                    pol:
+                      type: string
+                    pod:
+                      type: string
+                    polTerminalCd:
+                      type: string
+                    polTerminal:
+                      type: string
+                    podTerminalCd:
+                      type: string
+                    podTerminal:
+                      type: string
+                    etd:
+                      type: string
+                      format: date-time
+                    eta:
+                      type: string
+                      format: date-time
+                    etdTz:
+                      type: string
+                    etaTz:
+                      type: string
+                    ata:
+                      type: string
+                      format: date-time
+                      nullable: true
+                    atd:
+                      type: string
+                      format: date-time
+                      nullable: true
+                    isTransit:
+                      type: boolean
+                    routeCd:
+                      type: string
+                    createdAt:
+                      type: string
+                      format: date-time
+                    updatedAt:
+                      type: string
+                      format: date-time
+                  required:
+                    - id
+                    - version
+                    - carrierCd
+                    - isReferenceCarrier
+                    - serviceString
+                    - vessel
+                    - voyage
+                    - polCd
+                    - podCd
+                    - pol
+                    - pod
+                    - polTerminalCd
+                    - polTerminal
+                    - podTerminalCd
+                    - podTerminal
+                    - etd
+                    - eta
+                    - etdTz
+                    - etaTz
+                    - ata
+                    - atd
+                    - isTransit
+                    - routeCd
+                    - createdAt
+                    - updatedAt
+  /port-call-subscription/batch-updates:
+    get:
+      summary: Synchronize port call subcriptions in batch
+      tags: &a1
+        - portCallSubscriptionContract
+      parameters:
+        - name: sinceVersion
+          in: query
+          required: true
+          schema:
+            type: integer
+            nullable: true
+      responses:
+        "200":
+          description: "200"
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    version:
+                      type: integer
+                    vesselScheduleId:
+                      type: string
+                      nullable: true
+                    vessel:
+                      type: string
+                    polCd:
+                      type: string
+                    podCd:
+                      type: string
+                    etd:
+                      type: string
+                      format: date-time
+                    eta:
+                      type: string
+                      format: date-time
+                    ata:
+                      type: string
+                      format: date-time
+                      nullable: true
+                    atd:
+                      type: string
+                      format: date-time
+                      nullable: true
+                    createdAt:
+                      type: string
+                      format: date-time
+                    updatedAt:
+                      type: string
+                      format: date-time
+                  required:
+                    - id
+                    - version
+                    - vesselScheduleId
+                    - vessel
+                    - polCd
+                    - podCd
+                    - etd
+                    - eta
+                    - ata
+                    - atd
+                    - createdAt
+                    - updatedAt
+  /port-call-subscription:
+    put:
+      summary: Create or return a PortCallSubscription with content matching the body
+      tags: *a1
+      parameters: []
+      requestBody:
+        description: Body
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                vesselScheduleId:
+                  type: string
+                  nullable: true
+                vessel:
+                  type: string
+                polCd:
+                  type: string
+                podCd:
+                  type: string
+                etd:
+                  type: string
+                  format: date-time
+                eta:
+                  type: string
+                  format: date-time
+              required:
+                - vesselScheduleId
+                - vessel
+                - polCd
+                - podCd
+                - etd
+                - eta
+      responses:
+        "200":
+          description: "200"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  version:
+                    type: integer
+                  vesselScheduleId:
+                    type: string
+                    nullable: true
+                  vessel:
+                    type: string
+                  polCd:
+                    type: string
+                  podCd:
+                    type: string
+                  etd:
+                    type: string
+                    format: date-time
+                  eta:
+                    type: string
+                    format: date-time
+                  ata:
+                    type: string
+                    format: date-time
+                    nullable: true
+                  atd:
+                    type: string
+                    format: date-time
+                    nullable: true
+                  createdAt:
+                    type: string
+                    format: date-time
+                  updatedAt:
+                    type: string
+                    format: date-time
+                required:
+                  - id
+                  - version
+                  - vesselScheduleId
+                  - vessel
+                  - polCd
+                  - podCd
+                  - etd
+                  - eta
+                  - ata
+                  - atd
+                  - createdAt
+                  - updatedAt
+        "400":
+          description: "400"
+          content:
+            application/json:
+              schema:
+                type: string
+                enum:
+                  - VESSEL_NOT_TRACKABLE
+info:
+  title: tansu-schedule-tracker
+  version: 0.0.0

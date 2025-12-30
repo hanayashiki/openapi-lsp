@@ -1,4 +1,5 @@
 import { QueryCache } from "@openapi-lsp/core/queries";
+import { isRequestBody, isSchema, isReference } from "@openapi-lsp/core/openapi";
 import { TextDocument } from "vscode-languageserver-textdocument";
 import {
   DefinitionLink,
@@ -17,9 +18,10 @@ import { parseLocalRef } from "./analysis/parseLocalRef.js";
 import {
   serializeSchemaToMarkdown,
   serializeRequestBodyToMarkdown,
+  serializeRefToMarkdown,
   SerializeOptions,
-} from "./analysis/serializeSchema.js";
-import { getComponentKeyByPosition } from "./analysis/getComponentKeyByPosition.js";
+} from "./serialize/index.js";
+import { getDefinitionKeyByPosition } from "./analysis/getDefinitionKeyByPosition.js";
 import { resolveRef } from "./analysis/resolveRef.js";
 
 export class OpenAPILanguageServer {
@@ -112,7 +114,7 @@ export class OpenAPILanguageServer {
 
     // If not on a $ref, check if on a component key
     if (!definition) {
-      definition = getComponentKeyByPosition(analysis, params.position);
+      definition = getDefinitionKeyByPosition(analysis, params.position);
     }
 
     if (!definition) return null;
@@ -123,19 +125,21 @@ export class OpenAPILanguageServer {
       name: definition.name,
     };
 
-    switch (definition.component.kind) {
-      case "schema":
-        markdown = serializeSchemaToMarkdown(
-          definition.component.value,
-          serializeOptions
-        );
-        break;
-      case "requestBody":
-        markdown = serializeRequestBodyToMarkdown(
-          definition.component.value,
-          serializeOptions
-        );
-        break;
+    if (isSchema(definition.component)) {
+      markdown = serializeSchemaToMarkdown(
+        definition.component,
+        serializeOptions
+      );
+    } else if (isRequestBody(definition.component)) {
+      markdown = serializeRequestBodyToMarkdown(
+        definition.component,
+        serializeOptions
+      );
+    } else if (isReference(definition.component)) {
+      markdown = serializeRefToMarkdown(
+        definition.component,
+        serializeOptions
+      );
     }
 
     if (!markdown) return null;

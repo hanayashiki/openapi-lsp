@@ -55,7 +55,8 @@
     "watch": "node esbuild.mjs --watch",
     "clean": "rm -rf dist *.tsbuildinfo",
     "package": "pnpm bundle && vsce package --no-dependencies",
-    "test": "echo \"No tests yet\""
+    "test": "echo \"No tests yet\"",
+    "check": "tsc"
   },
   "dependencies": {
     "vscode-languageclient": "^9.0.1"
