@@ -66,7 +66,8 @@ packages/
 - `src/OpenAPILanaguageServer.ts` - Main LSP server with handlers for hover, definition, document lifecycle
 - `src/analysis/analyze.ts` - Validates YAML against OpenAPI schema
 - `src/analysis/SpecDocument.ts` - YAML AST wrapper with line counting
-- `src/analysis/getDefinitions.ts` - Extracts component definitions with source ranges
+- `src/analysis/Visitor.ts` - Visitor pattern for traversing OpenAPI documents
+- `src/analysis/getDefinitions.ts` - Extracts component definitions using Visitor
 - `src/analysis/getRefByPosition.ts` - Finds `$ref` at cursor position
 - `src/analysis/resolveRef.ts` - Resolves references to definitions
 - `src/analysis/serializeSchema.ts` - Converts schemas to markdown for hover display
@@ -86,6 +87,26 @@ VS Code Client ←→ LSP Server ←→ QueryCache ←→ Language Features (hov
 ## Key Patterns
 
 - **Typebox schemas** with fallback codecs allow graceful handling of partially valid OpenAPI specs
+- **TaggedObject** wraps each OpenAPI type to enable runtime type identification via `getOpenAPITag()`
 - **QueryCache** tracks dependencies and automatically invalidates downstream results when sources change
 - **Result types** (`Ok`/`Err`) used throughout for type-safe error handling - use `andThen` for chaining
 - **ESM modules** only - no CommonJS
+
+### Visitor Pattern
+
+The `Visitor` in `src/analysis/Visitor.ts` traverses paired OpenAPI objects and YAML AST nodes together. Each OpenAPI type has a corresponding visitor callback:
+
+```typescript
+visit({ document: openapi, yamlAst: spec.yamlAst }, {
+  Schema: ({ openapiNode, ast }) => {
+    // openapiNode: the decoded OpenAPI.Schema object
+    // ast.path: e.g. ["components", "schemas", "Pet"]
+    // ast.astNode: the YAMLMap node
+    // ast.keyNode: the Scalar key (when accessed via map)
+  },
+  Response: ({ openapiNode, ast }) => { ... },
+  // ... other types
+});
+```
+
+Use `ast.path` to determine context (e.g., `isComponentPath()` checks if under `components/`).

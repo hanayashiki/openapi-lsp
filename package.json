@@ -16,10 +16,12 @@
     "lint:fix": "oxlint packages --fix --ignore-pattern '*.d.ts'",
     "clean": "pnpm -r run clean",
     "test": "pnpm -r run test",
-    "package": "pnpm --filter @openapi-lsp/client run package"
+    "package": "pnpm --filter @openapi-lsp/client run package",
+    "prepare": "husky"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
+    "husky": "^9.1.7",
     "oxlint": "^0.15.3",
     "typescript": "^5.7.2"
   },
