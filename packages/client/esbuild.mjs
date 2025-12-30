@@ -15,7 +15,7 @@ const clientConfig = {
 
 /** @type {esbuild.BuildOptions} */
 const serverConfig = {
-  entryPoints: ["../server/out/server.js"],
+  entryPoints: ["../server/out/src/server.js"],
   bundle: true,
   outfile: "./dist/server.js",
   platform: "node",

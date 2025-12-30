@@ -1,5 +1,5 @@
 import { OpenAPI, OpenAPIInput } from "@openapi-lsp/core/openapi";
-import { SpecDocument } from "../document/SpecDocument.js";
+import { SpecDocument } from "./SpecDocument.js";
 import { Compile } from "typebox/compile";
 import { Analysis } from "./Analysis.js";
 import { AssertError } from "typebox/value";
@@ -14,7 +14,7 @@ export const analyzeSpecDocument = async (
 ): Promise<Analysis> => {
   try {
     // Pass raw input first to capture all typebox validation errors
-    const document = DocumentParser.Encode(spec.yamlAst.toJS());
+    const document = DocumentParser.Decode(spec.yamlAst.toJS());
 
     return {
       document,
@@ -25,7 +25,7 @@ export const analyzeSpecDocument = async (
     if (e instanceof AssertError) {
       const fellbackInput = DocumentInputParser.Encode(spec.yamlAst.toJS());
 
-      const document = DocumentParser.Parse(fellbackInput);
+      const document = DocumentParser.Decode(fellbackInput);
 
       return {
         document,

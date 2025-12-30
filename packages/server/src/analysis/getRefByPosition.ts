@@ -1,5 +1,5 @@
 import { OpenAPI } from "@openapi-lsp/core/openapi";
-import { SpecDocument } from "../document/SpecDocument.js";
+import { SpecDocument } from "./SpecDocument.js";
 import { Position } from "vscode-languageserver-textdocument";
 import { visit, isScalar } from "yaml";
 import { positionToOffset } from "./utils.js";

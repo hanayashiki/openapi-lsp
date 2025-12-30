@@ -11,3 +11,5 @@ export type SpecDocument = BaseSpecDocument<"openapi"> & {
   yamlAst: YamlDocument;
   lineCounter: LineCounter;
 };
+
+export type SpecDocumentPath = (string | number)[];

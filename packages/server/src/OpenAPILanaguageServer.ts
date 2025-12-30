@@ -9,7 +9,7 @@ import {
   TextDocumentChangeEvent,
 } from "vscode-languageserver";
 import { parseDocument, LineCounter } from "yaml";
-import { SpecDocument } from "./document/SpecDocument.js";
+import { SpecDocument } from "./analysis/SpecDocument.js";
 import { analyzeSpecDocument } from "./analysis/analyze.js";
 import { Analysis } from "./analysis/Analysis.js";
 import { getRefByPosition } from "./analysis/getRefByPosition.js";
