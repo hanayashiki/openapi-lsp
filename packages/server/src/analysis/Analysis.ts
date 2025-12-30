@@ -19,7 +19,9 @@ export type DefinitionComponent =
   | OpenAPI.SecurityScheme
   | OpenAPI.Link
   | OpenAPI.Callback
-  | OpenAPI.Reference;
+  | OpenAPI.Reference
+  | OpenAPI.MediaType
+  | OpenAPI.Content;
 
 export type Definition = {
   path: SpecDocumentPath;

@@ -1,4 +1,4 @@
-import { core, z, ZodObject } from "zod";
+import { core, z, ZodObject, ZodRecord, ZodString } from "zod";
 import { util } from "zod/v4/core";
 
 export const OpenAPITag = z.enum([
@@ -8,6 +8,7 @@ export const OpenAPITag = z.enum([
   "Discriminator",
   "Schema",
   "MediaType",
+  "Content",
   "Example",
   "Encoding",
   "Header",
@@ -41,6 +42,16 @@ export const TaggedObject = <T extends core.$ZodLooseShape>(
   tag: OpenAPITag
 ): ZodObject<util.Writeable<T>, core.$strip> => {
   return z.object(shape).transform((value) => {
+    tagStorage.set(value, tag);
+    return value;
+  }) as never;
+};
+
+export const TaggedRecord = <T extends core.SomeType>(
+  value: T,
+  tag: OpenAPITag,
+): ZodRecord<ZodString, T> => {
+  return z.record(z.string(), value).transform((value) => {
     tagStorage.set(value, tag);
     return value;
   }) as never;

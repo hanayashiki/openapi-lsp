@@ -1,4 +1,9 @@
-import { isComponents, OpenAPI } from "@openapi-lsp/core/openapi";
+import {
+  isComponents,
+  isMediaType,
+  isResponse,
+  OpenAPI,
+} from "@openapi-lsp/core/openapi";
 import { SpecDocument } from "./SpecDocument.js";
 import { Definition, DefinitionComponent } from "./Analysis.js";
 import { offsetToRange } from "./utils.js";
@@ -13,12 +18,20 @@ const createDefinitionCollector = (
 
     const maybeComponentsParent = parent?.parent;
 
+    const keyName = String(ast.keyNode.value);
+
+    let name: string | null = null;
+    if (maybeComponentsParent && isComponents(maybeComponentsParent.node)) {
+      name = keyName;
+    } else if (isMediaType(openapiNode)) {
+      name = keyName;
+    } else if (isResponse(openapiNode)) {
+      name = keyName;
+    }
+
     definitions.push({
       path: ast.path,
-      name:
-        maybeComponentsParent && isComponents(maybeComponentsParent.node)
-          ? String(ast.keyNode.value)
-          : null,
+      name,
       nameRange: offsetToRange(spec.lineCounter, ast.keyNode.range),
       definitionRange: offsetToRange(spec.lineCounter, ast.astNode.range),
       component: openapiNode,
@@ -47,6 +60,8 @@ export const getDefinitions = (
       Link: collector,
       Callback: collector,
       Reference: collector,
+      MediaType: collector,
+      Content: collector,
     }
   );
 

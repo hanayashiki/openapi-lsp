@@ -210,7 +210,7 @@ paths:
                 - eta
       responses:
         "200":
-          description: "200"
+          description: "Subscription is successfully created."
           content:
             application/json:
               schema:

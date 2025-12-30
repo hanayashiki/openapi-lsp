@@ -1,5 +1,12 @@
 import { QueryCache } from "@openapi-lsp/core/queries";
-import { isRequestBody, isSchema, isReference } from "@openapi-lsp/core/openapi";
+import {
+  isRequestBody,
+  isSchema,
+  isReference,
+  isMediaType,
+  isContent,
+  isResponse,
+} from "@openapi-lsp/core/openapi";
 import { TextDocument } from "vscode-languageserver-textdocument";
 import {
   DefinitionLink,
@@ -19,6 +26,9 @@ import {
   serializeSchemaToMarkdown,
   serializeRequestBodyToMarkdown,
   serializeRefToMarkdown,
+  serializeContentToMarkdown,
+  serializeMediaTypeToMarkdown,
+  serializeResponseToMarkdown,
   SerializeOptions,
 } from "./serialize/index.js";
 import { getDefinitionKeyByPosition } from "./analysis/getDefinitionKeyByPosition.js";
@@ -117,7 +127,10 @@ export class OpenAPILanguageServer {
       definition = getDefinitionKeyByPosition(analysis, params.position);
     }
 
-    if (!definition) return null;
+    if (!definition) {
+      console.error("Cannot retrieve definition");
+      return null;
+    }
 
     let markdown: string | null = null;
 
@@ -136,7 +149,19 @@ export class OpenAPILanguageServer {
         serializeOptions
       );
     } else if (isReference(definition.component)) {
-      markdown = serializeRefToMarkdown(
+      markdown = serializeRefToMarkdown(definition.component, serializeOptions);
+    } else if (isMediaType(definition.component)) {
+      markdown = serializeMediaTypeToMarkdown(
+        definition.component,
+        serializeOptions
+      );
+    } else if (isContent(definition.component)) {
+      markdown = serializeContentToMarkdown(
+        definition.component,
+        serializeOptions
+      );
+    } else if (isResponse(definition.component)) {
+      markdown = serializeResponseToMarkdown(
         definition.component,
         serializeOptions
       );

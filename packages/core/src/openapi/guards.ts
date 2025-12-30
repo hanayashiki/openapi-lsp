@@ -23,6 +23,9 @@ export const isSchema = (obj: object): obj is OpenAPI.Schema =>
 export const isMediaType = (obj: object): obj is OpenAPI.MediaType =>
   getOpenAPITag(obj) === "MediaType";
 
+export const isContent = (obj: object): obj is OpenAPI.Content =>
+  getOpenAPITag(obj) === "Content";
+
 export const isExample = (obj: object): obj is OpenAPI.Example =>
   getOpenAPITag(obj) === "Example";
 

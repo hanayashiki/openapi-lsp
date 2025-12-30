@@ -7,7 +7,7 @@
  */
 
 import { z } from "zod";
-import { setOpenAPITag, TaggedObject } from "./tag.js";
+import { setOpenAPITag, TaggedObject, TaggedRecord } from "./tag.js";
 
 // ------------------------------------------------------------------------------
 // OpenAPI Namespace
@@ -275,6 +275,8 @@ export namespace OpenAPI {
     "MediaType"
   );
 
+  export const Content = TaggedRecord(MediaType, "Content");
+
   // Header Object
   export const Header = TaggedObject(
     {
@@ -288,7 +290,7 @@ export namespace OpenAPI {
       schema: SchemaOrReference.optional(),
       example: z.unknown().optional(),
       examples: z.record(z.string(), ExampleOrReference).optional(),
-      content: z.record(z.string(), MediaType).optional(),
+      content: Content.optional(),
     },
     "Header"
   );
@@ -315,7 +317,7 @@ export namespace OpenAPI {
     {
       description: z.string(),
       headers: z.record(z.string(), HeaderOrReference).optional(),
-      content: z.record(z.string(), MediaType).optional(),
+      content: Content.optional(),
       links: z.record(z.string(), LinkOrReference).optional(),
     },
     "Response"
@@ -343,7 +345,7 @@ export namespace OpenAPI {
       schema: SchemaOrReference.optional(),
       example: z.unknown().optional(),
       examples: z.record(z.string(), ExampleOrReference).optional(),
-      content: z.record(z.string(), MediaType).optional(),
+      content: Content.optional(),
     },
     "Parameter"
   );
@@ -354,7 +356,7 @@ export namespace OpenAPI {
   export const RequestBody = TaggedObject(
     {
       description: z.string().optional(),
-      content: z.record(z.string(), MediaType),
+      content: Content,
       required: z.boolean().optional(),
     },
     "RequestBody"
@@ -509,6 +511,7 @@ export namespace OpenAPI {
   export type Discriminator = z.infer<typeof Discriminator>;
   export type Schema = z.infer<typeof Schema>;
   export type MediaType = z.infer<typeof MediaType>;
+  export type Content = z.infer<typeof Content>;
   export type Example = z.infer<typeof Example>;
   export type Encoding = z.infer<typeof Encoding>;
   export type Header = z.infer<typeof Header>;

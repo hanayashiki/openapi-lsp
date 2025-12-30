@@ -3,31 +3,23 @@ import type { SerializeOptions, SerializerContext } from "./types.js";
 import { serializeSchemaOrRef } from "./serializeSchema.js";
 
 /**
- * Serialize an OpenAPI RequestBody to markdown for hover display
+ * Serialize an OpenAPI Content (Record<string, MediaType>) to markdown for hover display.
+ * Displays each content type's schema one by one.
  */
-export function serializeRequestBodyToMarkdown(
-  requestBody: OpenAPI.RequestBody,
+export function serializeContentToMarkdown(
+  content: OpenAPI.Content,
   options: SerializeOptions = {}
 ): string {
   const { maxDepth = 2, name } = options;
 
   const parts: string[] = [];
 
-  // Add description if present
-  if (requestBody.description) {
-    parts.push(requestBody.description);
+  if (name) {
+    parts.push(`### ${name}`);
   }
 
-  // Add required status
-  if (requestBody.required) {
-    parts.push("**Required**");
-  }
-
-  // Get schema from content (use first media type's schema)
-  const content = requestBody.content;
   const mediaTypes = Object.keys(content);
 
-  // Show each media type with its schema
   for (const mediaType of mediaTypes) {
     const mediaTypeObj = content[mediaType];
     const schema = mediaTypeObj?.schema;
@@ -40,9 +32,8 @@ export function serializeRequestBodyToMarkdown(
       };
 
       const serialized = serializeSchemaOrRef(schema, ctx);
-      const nameOrInline = name ? `type ${name} = ` : "";
       parts.push(
-        `\`${mediaType}\`\n\`\`\`typescript\n${nameOrInline}${serialized}\n\`\`\``
+        `\`${mediaType}\`\n\`\`\`typescript\n${serialized}\n\`\`\``
       );
     }
   }

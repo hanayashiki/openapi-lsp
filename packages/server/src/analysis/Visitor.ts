@@ -59,6 +59,7 @@ export interface Visitor {
   // Layer 4: Schema-dependent types
   Encoding?: VisitorFn<OpenAPI.Encoding>;
   MediaType?: VisitorFn<OpenAPI.MediaType>;
+  Content?: VisitorFn<OpenAPI.Content>;
   Header?: VisitorFn<OpenAPI.Header>;
   Link?: VisitorFn<OpenAPI.Link>;
   Response?: VisitorFn<OpenAPI.Response>;
