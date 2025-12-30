@@ -1,7 +1,12 @@
 {
   "name": "openapilspclient",
   "repository": {
-    "url": "https://github.com/hanayashiki/openapi-lsp"
+    "type": "git",
+    "url": "https://github.com/hanayashiki/openapi-lsp",
+    "directory": "packages/client"
+  },
+  "vsce": {
+    "baseImagesUrl": "https://raw.githubusercontent.com/hanayashiki/openapi-lsp/master/packages/client"
   },
   "displayName": "OpenAPI LSP",
   "description": "Language support for OpenAPI/Swagger specifications",
