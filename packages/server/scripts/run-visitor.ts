@@ -1,17 +1,22 @@
-import { readFileSync } from "node:fs";
-import { parseDocument } from "yaml";
-import { Compile } from "typebox/compile";
 import { getOpenAPITag, OpenAPI } from "@openapi-lsp/core/openapi";
+import Type from "typebox";
+import { Compile } from "typebox/compile";
+import { Value } from "typebox/value";
 
-const file = readFileSync(
-  "/Users/chenyuwang/openapi-lsp/examples/petstore.openapi.yml",
-  "utf-8"
+const testData = {
+  MyRequestBody: { description: "test", content: {}, required: true },
+};
+
+const RecordSchema = Type.Record(
+  Type.String(),
+  Type.Union([OpenAPI.RequestBody, OpenAPI.Reference])
 );
 
-const yamlAst = parseDocument(file);
+// Test 1: Compiled decoder
+const CompiledRecord = Compile(RecordSchema);
+const compiledDecoded = CompiledRecord.Decode(testData);
+console.log("compiled record decode tag:", getOpenAPITag(compiledDecoded.MyRequestBody));
 
-const DocumentParser = Compile(OpenAPI.Document);
-
-const document = DocumentParser.Decode(yamlAst.toJS());
-
-console.log(getOpenAPITag(document.components?.schemas!.Pet!));
+// Test 2: Value.Decode (non-compiled)
+const valueDecoded = Value.Decode(RecordSchema, testData);
+console.log("value record decode tag:", getOpenAPITag(valueDecoded.MyRequestBody));

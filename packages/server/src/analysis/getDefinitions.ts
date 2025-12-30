@@ -1,4 +1,4 @@
-import { OpenAPI } from "@openapi-lsp/core/openapi";
+import { getOpenAPITag, OpenAPI } from "@openapi-lsp/core/openapi";
 import { SpecDocument } from "./SpecDocument.js";
 import { Definition, DefinitionComponent } from "./Analysis.js";
 import { offsetToRange } from "./utils.js";
@@ -6,29 +6,24 @@ import { visit, VisitorInput } from "./Visitor.js";
 
 type ComponentKind = DefinitionComponent["kind"];
 
-const isComponentPath = (
-  path: (string | number)[]
-): path is ["components", string, string] => {
-  return (
-    path.length === 3 &&
-    path[0] === "components" &&
-    typeof path[1] === "string" &&
-    typeof path[2] === "string"
-  );
-};
-
 const createDefinitionCollector = (
   spec: SpecDocument,
   definitions: Definition[],
   kind: ComponentKind
 ) => {
-  return ({ openapiNode, ast }: VisitorInput<object>) => {
-    if (!isComponentPath(ast.path)) return;
+  return ({ openapiNode, ast, parent }: VisitorInput<object>) => {
     if (!ast.keyNode?.range || !ast.astNode.range) return;
+
+    const maybeComponentsParent = parent?.parent;
 
     definitions.push({
       path: ast.path,
-      componentNameRange: offsetToRange(spec.lineCounter, ast.keyNode.range),
+      name:
+        maybeComponentsParent &&
+        getOpenAPITag(maybeComponentsParent.node) === "Components"
+          ? String(ast.keyNode.value)
+          : null,
+      nameRange: offsetToRange(spec.lineCounter, ast.keyNode.range),
       definitionRange: offsetToRange(spec.lineCounter, ast.astNode.range),
       component: {
         kind,
@@ -62,6 +57,6 @@ export const getDefinitions = (
       Callback: createDefinitionCollector(spec, definitions, "callback"),
     }
   );
-
+  // console.log('defs', JSON.stringify(definitions, null, 2))
   return definitions;
 };

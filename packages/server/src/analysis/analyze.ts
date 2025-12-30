@@ -16,6 +16,8 @@ export const analyzeSpecDocument = async (
     // Pass raw input first to capture all typebox validation errors
     const document = DocumentParser.Decode(spec.yamlAst.toJS());
 
+    console.log("document", JSON.stringify(document, null, 2));
+
     return {
       document,
       typeboxError: none(),

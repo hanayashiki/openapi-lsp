@@ -5,6 +5,7 @@
  */
 
 import Type from "typebox";
+//import { Settings } from "typebox/system";
 import { TaggedObject } from "./tag.js";
 
 // ------------------------------------------------------------------------------
@@ -15,6 +16,10 @@ import { TaggedObject } from "./tag.js";
 // All other types use direct references
 // ------------------------------------------------------------------------------
 export namespace OpenAPI {
+  // @see https://github.com/sinclairzx81/typebox/issues/1495
+  // the bug erases settings by `Type.Codec` so decoding does not work in `TaggedObject`
+  //Settings.Set({ enumerableKind: true });
+
   // ===========================================================================
   // Layer 1: Leaf types (no dependencies)
   // ===========================================================================
@@ -148,53 +153,50 @@ export namespace OpenAPI {
 
   export const Schema = Type.Cyclic(
     {
-      Schema: TaggedObject(
-        Type.Object({
-          // JSON Schema properties
-          title: Type.Optional(Type.String()),
-          multipleOf: Type.Optional(Type.Number()),
-          maximum: Type.Optional(Type.Number()),
-          exclusiveMaximum: Type.Optional(Type.Boolean()),
-          minimum: Type.Optional(Type.Number()),
-          exclusiveMinimum: Type.Optional(Type.Boolean()),
-          maxLength: Type.Optional(Type.Integer()),
-          minLength: Type.Optional(Type.Integer()),
-          pattern: Type.Optional(Type.String()),
-          maxItems: Type.Optional(Type.Integer()),
-          minItems: Type.Optional(Type.Integer()),
-          uniqueItems: Type.Optional(Type.Boolean()),
-          maxProperties: Type.Optional(Type.Integer()),
-          minProperties: Type.Optional(Type.Integer()),
-          required: Type.Optional(Type.Array(Type.String())),
-          enum: Type.Optional(Type.Array(Type.Unknown())),
+      Schema: Type.Object({
+        // JSON Schema properties
+        title: Type.Optional(Type.String()),
+        multipleOf: Type.Optional(Type.Number()),
+        maximum: Type.Optional(Type.Number()),
+        exclusiveMaximum: Type.Optional(Type.Boolean()),
+        minimum: Type.Optional(Type.Number()),
+        exclusiveMinimum: Type.Optional(Type.Boolean()),
+        maxLength: Type.Optional(Type.Integer()),
+        minLength: Type.Optional(Type.Integer()),
+        pattern: Type.Optional(Type.String()),
+        maxItems: Type.Optional(Type.Integer()),
+        minItems: Type.Optional(Type.Integer()),
+        uniqueItems: Type.Optional(Type.Boolean()),
+        maxProperties: Type.Optional(Type.Integer()),
+        minProperties: Type.Optional(Type.Integer()),
+        required: Type.Optional(Type.Array(Type.String())),
+        enum: Type.Optional(Type.Array(Type.Unknown())),
 
-          // Modified JSON Schema properties - use SchemaOrRef for schema references
-          type: Type.Optional(Type.String()),
-          allOf: Type.Optional(Type.Array(SchemaOrRef)),
-          oneOf: Type.Optional(Type.Array(SchemaOrRef)),
-          anyOf: Type.Optional(Type.Array(SchemaOrRef)),
-          not: Type.Optional(SchemaOrRef),
-          items: Type.Optional(SchemaOrRef),
-          properties: Type.Optional(Type.Record(Type.String(), SchemaOrRef)),
-          additionalProperties: Type.Optional(
-            Type.Union([Type.Boolean(), SchemaOrRef])
-          ),
-          description: Type.Optional(Type.String()),
-          format: Type.Optional(Type.String()),
-          default: Type.Optional(Type.Unknown()),
+        // Modified JSON Schema properties - use SchemaOrRef for schema references
+        type: Type.Optional(Type.String()),
+        allOf: Type.Optional(Type.Array(SchemaOrRef)),
+        oneOf: Type.Optional(Type.Array(SchemaOrRef)),
+        anyOf: Type.Optional(Type.Array(SchemaOrRef)),
+        not: Type.Optional(SchemaOrRef),
+        items: Type.Optional(SchemaOrRef),
+        properties: Type.Optional(Type.Record(Type.String(), SchemaOrRef)),
+        additionalProperties: Type.Optional(
+          Type.Union([Type.Boolean(), SchemaOrRef])
+        ),
+        description: Type.Optional(Type.String()),
+        format: Type.Optional(Type.String()),
+        default: Type.Optional(Type.Unknown()),
 
-          // OpenAPI-specific properties
-          nullable: Type.Optional(Type.Boolean()),
-          discriminator: Type.Optional(Discriminator),
-          readOnly: Type.Optional(Type.Boolean()),
-          writeOnly: Type.Optional(Type.Boolean()),
-          xml: Type.Optional(XML),
-          externalDocs: Type.Optional(ExternalDocumentation),
-          example: Type.Optional(Type.Unknown()),
-          deprecated: Type.Optional(Type.Boolean()),
-        }),
-        "Schema"
-      ),
+        // OpenAPI-specific properties
+        nullable: Type.Optional(Type.Boolean()),
+        discriminator: Type.Optional(Discriminator),
+        readOnly: Type.Optional(Type.Boolean()),
+        writeOnly: Type.Optional(Type.Boolean()),
+        xml: Type.Optional(XML),
+        externalDocs: Type.Optional(ExternalDocumentation),
+        example: Type.Optional(Type.Unknown()),
+        deprecated: Type.Optional(Type.Boolean()),
+      }),
     },
     "Schema"
   );

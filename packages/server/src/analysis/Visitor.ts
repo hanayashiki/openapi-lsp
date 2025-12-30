@@ -22,9 +22,15 @@ export interface AstContext {
   keyNode?: Scalar;
 }
 
+export interface OpenAPINodeLink {
+  parent: OpenAPINodeLink | undefined;
+  node: object;
+}
+
 export interface VisitorInput<OpenAPINode extends object> {
   openapiNode: OpenAPINode;
   ast: AstContext;
+  parent: OpenAPINodeLink | undefined;
 }
 
 export type VisitorFn<OpenAPINode extends object> = (
@@ -75,6 +81,14 @@ export interface Visitor {
   Document?: VisitorFn<OpenAPI.Document>;
 }
 
+interface RecurseContext {
+  currentPath: SpecDocumentPath;
+  currentAstNode: Node<unknown>;
+  currentOpenAPINode: object;
+  visitor: Visitor;
+  currentLink?: OpenAPINodeLink;
+}
+
 export const visit = (input: VisitInput, visitor: Visitor) => {
   const rootAstNode = input.yamlAst.contents;
   if (!rootAstNode || !isMap(rootAstNode)) {
@@ -87,17 +101,25 @@ export const visit = (input: VisitInput, visitor: Visitor) => {
       path: [],
       astNode: rootAstNode,
     },
+    parent: undefined,
   });
 
-  _visit([], rootAstNode, input.document, visitor);
+  _visit({
+    currentPath: [],
+    currentAstNode: rootAstNode,
+    currentOpenAPINode: input.document,
+    visitor,
+    currentLink: undefined,
+  });
 };
 
-const _visit = (
-  currentPath: SpecDocumentPath,
-  currentAstNode: Node<unknown>,
-  currentOpenAPINode: object,
-  visitor: Visitor
-) => {
+const _visit = ({
+  currentPath,
+  currentAstNode,
+  currentOpenAPINode,
+  visitor,
+  currentLink,
+}: RecurseContext) => {
   if (isMap(currentAstNode)) {
     for (const pair of currentAstNode.items) {
       if (!isScalar(pair.key) || !isNode(pair.value)) {
@@ -111,7 +133,6 @@ const _visit = (
 
       if (nextOpenAPINode && typeof nextOpenAPINode === "object") {
         const tag = getOpenAPITag(nextOpenAPINode);
-
         if (tag && isMap(nextAstNode)) {
           visitor[tag]?.({
             openapiNode: nextOpenAPINode as any,
@@ -120,16 +141,26 @@ const _visit = (
               astNode: nextAstNode,
               keyNode: pair.key,
             },
+            parent: currentLink,
           });
         }
 
-        _visit(nextPath, nextAstNode, nextOpenAPINode, visitor);
+        _visit({
+          currentPath: nextPath,
+          currentAstNode: nextAstNode,
+          currentOpenAPINode: nextOpenAPINode,
+          visitor,
+          currentLink: {
+            node: nextOpenAPINode,
+            parent: currentLink,
+          },
+        });
       }
     }
   } else if (isSeq(currentAstNode)) {
     for (let i = 0; i < currentAstNode.items.length; i++) {
-      const item = currentAstNode.items[i];
-      if (!isNode(item)) {
+      const nextAstNode = currentAstNode.items[i];
+      if (!isNode(nextAstNode)) {
         continue;
       }
 
@@ -139,17 +170,27 @@ const _visit = (
       if (nextOpenAPINode && typeof nextOpenAPINode === "object") {
         const tag = getOpenAPITag(nextOpenAPINode);
 
-        if (tag && isMap(item)) {
+        if (tag && isMap(nextAstNode)) {
           visitor[tag]?.({
             openapiNode: nextOpenAPINode as any,
             ast: {
               path: nextPath,
-              astNode: item,
+              astNode: nextAstNode,
             },
+            parent: currentLink,
           });
         }
 
-        _visit(nextPath, item, nextOpenAPINode, visitor);
+        _visit({
+          currentPath: nextPath,
+          currentAstNode: nextAstNode,
+          currentOpenAPINode: nextOpenAPINode,
+          visitor,
+          currentLink: {
+            node: nextOpenAPINode,
+            parent: currentLink,
+          },
+        });
       }
     }
   }

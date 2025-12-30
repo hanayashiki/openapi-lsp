@@ -17,6 +17,7 @@ import { parseLocalRef } from "./analysis/parseLocalRef.js";
 import {
   serializeSchemaToMarkdown,
   serializeRequestBodyToMarkdown,
+  SerializeOptions,
 } from "./analysis/serializeSchema.js";
 import { getComponentKeyByPosition } from "./analysis/getComponentKeyByPosition.js";
 import { resolveRef } from "./analysis/resolveRef.js";
@@ -86,7 +87,7 @@ export class OpenAPILanguageServer {
       {
         targetUri: params.textDocument.uri,
         targetRange: definition.definitionRange,
-        targetSelectionRange: definition.componentNameRange,
+        targetSelectionRange: definition.nameRange,
       },
     ];
   }
@@ -116,15 +117,24 @@ export class OpenAPILanguageServer {
 
     if (!definition) return null;
 
-    const name = definition.path[definition.path.length - 1];
     let markdown: string | null = null;
+
+    const serializeOptions: SerializeOptions = {
+      name: definition.name,
+    };
 
     switch (definition.component.kind) {
       case "schema":
-        markdown = serializeSchemaToMarkdown(definition.component.value, name);
+        markdown = serializeSchemaToMarkdown(
+          definition.component.value,
+          serializeOptions
+        );
         break;
       case "requestBody":
-        markdown = serializeRequestBodyToMarkdown(definition.component.value, name);
+        markdown = serializeRequestBodyToMarkdown(
+          definition.component.value,
+          serializeOptions
+        );
         break;
     }
 

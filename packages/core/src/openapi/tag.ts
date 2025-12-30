@@ -43,10 +43,12 @@ export const TaggedObject = <T extends Type.TObject>(
   schema: T,
   tag: OpenAPITag
 ): T => {
-  return Type.Decode(schema, (value) => {
-    tagStorage.set(value as object, tag);
-    return value;
-  }) as any as T;
+  return Type.Codec(schema)
+    .Decode((value) => {
+      tagStorage.set(value as object, tag);
+      return value;
+    })
+    .Encode((value) => value) as T;
 };
 
 export const getOpenAPITag = (obj: object): OpenAPITag | undefined => {

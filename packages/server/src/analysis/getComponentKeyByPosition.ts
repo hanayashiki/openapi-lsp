@@ -7,7 +7,7 @@ export function getComponentKeyByPosition(
   position: Position
 ): Definition | null {
   for (const def of analysis.definitions) {
-    if (isPositionInRange(position, def.componentNameRange)) {
+    if (isPositionInRange(position, def.nameRange)) {
       return def;
     }
   }

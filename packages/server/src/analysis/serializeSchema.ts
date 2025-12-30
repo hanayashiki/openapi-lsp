@@ -2,6 +2,7 @@ import { OpenAPI } from "@openapi-lsp/core/openapi";
 
 // Public options
 export interface SerializeOptions {
+  name?: string | null;
   maxDepth?: number; // Default: 2
 }
 
@@ -140,7 +141,11 @@ function serializeArraySchema(
   });
 
   // Use Array<T> for complex types, T[] for simple
-  if (itemType.includes(" | ") || itemType.includes(" & ") || itemType.includes("{")) {
+  if (
+    itemType.includes(" | ") ||
+    itemType.includes(" & ") ||
+    itemType.includes("{")
+  ) {
     return `Array<${itemType}>`;
   }
   return `${itemType}[]`;
@@ -158,8 +163,10 @@ function serializeComposition(
 
   // Wrap complex types in parentheses if needed
   const parts = serialized.map((s) => {
-    if ((operator === "&" && s.includes(" | ")) ||
-        (operator === "|" && s.includes(" & "))) {
+    if (
+      (operator === "&" && s.includes(" | ")) ||
+      (operator === "|" && s.includes(" & "))
+    ) {
       return `(${s})`;
     }
     return s;
@@ -195,7 +202,9 @@ function serializeSchema(
   }
 
   // Infer type from structure if not explicit
-  const type = schema.type ?? (schema.properties ? "object" : schema.items ? "array" : undefined);
+  const type =
+    schema.type ??
+    (schema.properties ? "object" : schema.items ? "array" : undefined);
 
   switch (type) {
     case "object":
@@ -222,10 +231,9 @@ function serializeSchema(
  */
 export function serializeSchemaToMarkdown(
   schema: OpenAPI.Schema | OpenAPI.Reference,
-  name: string,
   options: SerializeOptions = {}
 ): string {
-  const { maxDepth = 2 } = options;
+  const { maxDepth = 2, name } = options;
 
   const ctx: SerializerContext = {
     currentDepth: 0,
@@ -249,7 +257,8 @@ export function serializeSchemaToMarkdown(
   }
 
   // Add code block
-  parts.push(`\`\`\`typescript\ntype ${name} = ${serialized}\n\`\`\``);
+  const nameOrInline = name ? `type ${name} = ` : "";
+  parts.push(`\`\`\`typescript\n${nameOrInline}${serialized}\n\`\`\``);
 
   return parts.join("\n\n");
 }
@@ -259,10 +268,9 @@ export function serializeSchemaToMarkdown(
  */
 export function serializeRequestBodyToMarkdown(
   requestBody: OpenAPI.RequestBody | OpenAPI.Reference,
-  name: string,
   options: SerializeOptions = {}
 ): string {
-  const { maxDepth = 2 } = options;
+  const { maxDepth = 2, name } = options;
 
   // If it's a reference, just show the ref
   if (isReference(requestBody)) {
@@ -287,7 +295,9 @@ export function serializeRequestBodyToMarkdown(
 
   if (mediaTypes.length > 0) {
     // Show media types
-    parts.push(`Media types: ${mediaTypes.map(mt => `\`${mt}\``).join(", ")}`);
+    parts.push(
+      `Media types: ${mediaTypes.map((mt) => `\`${mt}\``).join(", ")}`
+    );
 
     // Get the first schema to display
     const firstMediaType = content[mediaTypes[0]];
@@ -301,7 +311,9 @@ export function serializeRequestBodyToMarkdown(
       };
 
       const serialized = serializeSchema(schema, ctx);
-      parts.push(`\`\`\`typescript\n(requestBody) ${name}: ${serialized}\n\`\`\``);
+      parts.push(
+        `\`\`\`typescript\n(requestBody) ${name}: ${serialized}\n\`\`\``
+      );
     }
   }
 

@@ -1,0 +1,17 @@
+openapi: "3.0.3"
+info:
+  title: Debug API
+  version: "1.0"
+paths: {}
+components:
+  requestBodies:
+    CreateUserBody:
+      description: User creation payload
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              name:
+                type: string
