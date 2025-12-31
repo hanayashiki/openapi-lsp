@@ -12,7 +12,9 @@ export class ServerDocumentManager {
     private documents: TextDocuments<TextDocument>,
     private cache: QueryCache,
     private vfs: VFS
-  ) {}
+  ) {
+    // TODO: check workspace limit - do not resolve outside the workspace
+  }
 
   onDidOpen(doc: TextDocument) {
     const { uri } = doc;

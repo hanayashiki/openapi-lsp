@@ -1,31 +1,34 @@
 import { Result } from "@openapi-lsp/core/result";
+import { ServerDocument } from "./ServerDocument.js";
 
 export type ModuleResolutionType = "file" | "http";
 
 export type ModuleResolution =
   | {
       type: "file";
-      path: string;
+      uri: string;
     }
   | {
       type: "http";
-      url: string;
+      uri: string;
       cachePath: string;
     };
 
 export type ModuleResolutionInput = {
   ref: string;
+  baseUri: string;
 };
 
 export type ModuleResolutionError =
   | {
-      type: "notFound";
+      type: "invalidUri";
     }
   | {
-      type: "invalidUri";
+      type: "unsupportedUriScheme";
+      scheme: string;
     };
 
 export type ModuleResolutionResult = Result<
-  ModuleResolution,
+  ServerDocument,
   ModuleResolutionError
 >;

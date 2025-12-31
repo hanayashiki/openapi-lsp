@@ -35,10 +35,12 @@ import { getDefinitionKeyByPosition } from "./analysis/getDefinitionKeyByPositio
 import { resolveRef } from "./analysis/resolveRef.js";
 import { VFS } from "./vfs/VFS.js";
 import { ServerDocumentManager } from "./analysis/DocumentManager.js";
+import { Resolver } from "./analysis/Resolver.js";
 
 export class OpenAPILanguageServer {
   cache: QueryCache;
   documentManager: ServerDocumentManager;
+  resolver: Resolver;
 
   constructor(
     private documents: TextDocuments<TextDocument>,
@@ -50,6 +52,7 @@ export class OpenAPILanguageServer {
       this.cache,
       this.vfs
     );
+    this.resolver = new Resolver(this.documentManager);
   }
 
   async onDidOpen(event: TextDocumentChangeEvent<TextDocument>) {
