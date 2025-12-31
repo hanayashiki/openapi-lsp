@@ -15,20 +15,22 @@ const connection = createConnection(ProposedFeatures.all);
 const documents = new TextDocuments(TextDocument);
 
 connection.onInitialize((params: InitializeParams): InitializeResult => {
+  const workspace = {
+    workspaceFolders:
+      params.workspaceFolders ?? /** Fallback using deprecated rootUri, then use current working path */ [
+        {
+          name: "Root",
+          uri:
+            params.rootUri ??
+            pathToFileURL(params.rootPath ?? process.cwd()).toString(),
+        },
+      ],
+  };
+
   const server = new OpenAPILanguageServer(
-    {
-      workspaceFolders:
-        params.workspaceFolders ?? /** Fallback using deprecated rootUri, then use current working path */ [
-          {
-            name: "Root",
-            uri:
-              params.rootUri ??
-              pathToFileURL(params.rootPath ?? process.cwd()).toString(),
-          },
-        ],
-    },
+    workspace,
     documents,
-    new NodeVFS()
+    new NodeVFS(workspace)
   );
 
   connection.onDefinition(async (params) => {

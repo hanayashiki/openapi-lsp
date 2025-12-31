@@ -1,24 +1,30 @@
-import { CacheComputeContext, QueryCache } from "@openapi-lsp/core/queries";
+import {
+  CacheComputeContext,
+  CacheLoader,
+  QueryCache,
+} from "@openapi-lsp/core/queries";
 import { Resolver } from "./Resolver.js";
 import { ServerDocumentManager } from "./DocumentManager.js";
 import { DocumentRef, DocumentReferences } from "./DocumentReference.js";
 import { isPositionInRange } from "./utils.js";
 import { isLocalPointer } from "@openapi-lsp/core/json-pointer";
-import { fastUri } from "fast-uri";
 import { Position } from "vscode-languageserver-textdocument";
 import { DefinitionLink } from "vscode-languageserver";
 
 export class DocumentReferenceManager {
+  loader: CacheLoader<
+    ["serverDocument.documentReferences", string],
+    DocumentReferences
+  >;
+
   constructor(
     private documentManager: ServerDocumentManager,
     private resolver: Resolver,
-    private cache: QueryCache
-  ) {}
-
-  private setCache = (uri: string) => {
-    this.cache.set(["serverDocument.documentReferences", uri], {
-      computeFn: async (ctx): Promise<DocumentReferences> => {
-        const document = await ServerDocumentManager.load(ctx, uri);
+    cache: QueryCache
+  ) {
+    this.loader = cache.createLoader(
+      async ([_, uri], ctx): Promise<DocumentReferences> => {
+        const document = await this.documentManager.load(ctx, uri);
 
         if (document.type === "openapi" || document.type === "component") {
           const yamlRefs = document.yaml.collectRefs();
@@ -32,7 +38,7 @@ export class DocumentReferenceManager {
                   keyRange,
                   pointerRange,
                 }): Promise<DocumentRef> => {
-                  const resolved = await this.resolver.resolve({
+                  const resolved = await this.resolver.load(ctx, {
                     baseUri: uri,
                     ref,
                   });
@@ -53,17 +59,12 @@ export class DocumentReferenceManager {
             references: [],
           };
         }
-      },
-    });
-  };
+      }
+    );
+  }
 
   getDocumentReferences = async (uri: string): Promise<DocumentReferences> => {
-    this.setCache(uri);
-
-    return (await this.cache.compute([
-      "serverDocument.documentReferences",
-      uri,
-    ])) as DocumentReferences;
+    return await this.loader.use(["serverDocument.documentReferences", uri]);
   };
 
   getDefinitionLinkAtPosition = async (
@@ -92,27 +93,18 @@ export class DocumentReferenceManager {
     const targetDoc = docRef.resolved.data;
     if (targetDoc.type === "tomb") return null;
 
-    // TODO: reorganize this
-    // Parse ref with fast-uri to extract fragment properly
-    const refComponent = fastUri.parse(docRef.ref);
-    const fragment = refComponent.fragment;
+    // Extract fragment using native URL (dummy base for parsing relative refs)
+    const refUrl = new URL(docRef.ref, "file:///");
+    const fragment = refUrl.hash || "#";
 
-    // Create a URI with only the fragment part (empty fragment becomes "#" -> root)
-    const fragmentUri = fastUri.serialize({ fragment: fragment ?? "" });
     // Jump to JSON pointer location in target file (empty fragment = root = position 0)
-    return targetDoc.yaml.getDefinitionLinkByRef(fragmentUri, targetDoc.uri);
+    return targetDoc.yaml.getDefinitionLinkByRef(fragment, targetDoc.uri);
   };
 
-  // todo: make setCache/get/load concise
-  static async load(
+  load = (
     ctx: CacheComputeContext,
     uri: string
-  ): Promise<DocumentReferences> {
-    const document = (await ctx.load([
-      "serverDocument.documentReferences",
-      uri,
-    ])) as DocumentReferences;
-
-    return document;
-  }
+  ): Promise<DocumentReferences> => {
+    return this.loader.load(ctx, ["serverDocument.documentReferences", uri]);
+  };
 }

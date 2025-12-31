@@ -1,4 +1,8 @@
-import { CacheComputeContext, QueryCache } from "@openapi-lsp/core/queries";
+import {
+  CacheComputeContext,
+  CacheLoader,
+  QueryCache,
+} from "@openapi-lsp/core/queries";
 import { fileURLToPath } from "node:url";
 import * as path from "node:path";
 import { LineCounter, parseDocument } from "yaml";
@@ -11,28 +15,15 @@ import { ok, Result } from "@openapi-lsp/core/result";
 import { isOpenapiFile, isComponentFile } from "@openapi-lsp/core/constants";
 
 export class ServerDocumentManager {
+  loader: CacheLoader<["serverDocument", string], ServerDocument>;
+
   constructor(
     private documents: TextDocuments<TextDocument>,
-    private cache: QueryCache,
+    cache: QueryCache,
     private vfs: VFS
   ) {
-    // TODO: check workspace limit - do not resolve outside the workspace
-  }
-
-  // ---- Change Handlers -----
-
-  onDidOpen(doc: TextDocument) {
-    const { uri } = doc;
-    this.setCache(uri);
-  }
-
-  onDidChangeContent(doc: TextDocument) {
-    this.cache.invalidateByKey(["serverDocument", doc.uri]);
-  }
-
-  private setCache = (uri: string) => {
-    this.cache.set(["serverDocument", uri], {
-      computeFn: async (): Promise<ServerDocument> => {
+    this.loader = cache.createLoader(
+      async ([_, uri]): Promise<ServerDocument> => {
         const textResult = await this.readContent(uri);
 
         if (textResult.success) {
@@ -56,35 +47,29 @@ export class ServerDocumentManager {
             return { type: "tomb", uri };
           }
         } else {
-          return {
-            type: "tomb",
-            uri,
-          };
+          return { type: "tomb", uri };
         }
-      },
-    });
-  };
+      }
+    );
+  }
+
+  // ---- Change Handlers -----
+
+  onDidOpen(_doc: TextDocument) {
+    // No-op: loader handles cache setup on first use
+  }
+
+  onDidChangeContent(doc: TextDocument) {
+    this.loader.invalidate(["serverDocument", doc.uri]);
+  }
 
   getServerDocument = async (uri: string): Promise<ServerDocument> => {
-    this.setCache(uri);
-
-    return (await this.cache.compute([
-      "serverDocument",
-      uri,
-    ])) as ServerDocument;
+    return await this.loader.use(["serverDocument", uri]);
   };
 
-  static async load(
-    ctx: CacheComputeContext,
-    uri: string
-  ): Promise<ServerDocument> {
-    const document = (await ctx.load([
-      "serverDocument",
-      uri,
-    ])) as ServerDocument;
-
-    return document;
-  }
+  load = (ctx: CacheComputeContext, uri: string): Promise<ServerDocument> => {
+    return this.loader.load(ctx, ["serverDocument", uri]);
+  };
 
   private async readContent(uri: string): Promise<Result<string, VFSError>> {
     const text = this.documents.get(uri)?.getText();

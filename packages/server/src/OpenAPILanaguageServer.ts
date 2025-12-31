@@ -17,9 +17,6 @@ import {
   TextDocumentChangeEvent,
   TextDocuments,
 } from "vscode-languageserver";
-import { SpecDocument } from "./analysis/ServerDocument.js";
-import { analyzeSpecDocument } from "./analysis/analyze.js";
-import { Analysis } from "./analysis/Analysis.js";
 import {
   serializeSchemaToMarkdown,
   serializeRequestBodyToMarkdown,
@@ -36,16 +33,18 @@ import { ServerDocumentManager } from "./analysis/DocumentManager.js";
 import { Resolver } from "./analysis/Resolver.js";
 import { Workspace } from "./workspace/Workspace.js";
 import { DocumentReferenceManager } from "./analysis/DocumentReferenceManager.js";
+import { AnalysisManager } from "./analysis/AnalysisManager.js";
 
 export class OpenAPILanguageServer {
   cache: QueryCache;
   documentManager: ServerDocumentManager;
   resolver: Resolver;
   documentReferenceManager: DocumentReferenceManager;
+  analysisManager: AnalysisManager;
 
   constructor(
-    // @ts-ignore
-    private _workspace: Workspace,
+    // @ts-expect-error will use it
+    private workspace: Workspace,
     private documents: TextDocuments<TextDocument>,
     private vfs: VFS
   ) {
@@ -55,27 +54,17 @@ export class OpenAPILanguageServer {
       this.cache,
       this.vfs
     );
-    this.resolver = new Resolver(this.documentManager);
+    this.resolver = new Resolver(this.documentManager, this.cache);
     this.documentReferenceManager = new DocumentReferenceManager(
       this.documentManager,
       this.resolver,
       this.cache
     );
+    this.analysisManager = new AnalysisManager(this.documentManager, this.cache);
   }
 
   async onDidOpen(event: TextDocumentChangeEvent<TextDocument>) {
     this.documentManager.onDidOpen(event.document);
-
-    this.cache.set(["specDocument.analyze", event.document.uri], {
-      computeFn: async (ctx): Promise<Analysis> => {
-        const yamlAst = (await ctx.load([
-          "serverDocument",
-          event.document.uri,
-        ])) as SpecDocument;
-
-        return analyzeSpecDocument(yamlAst);
-      },
-    });
   }
 
   // ----- TextDocuments handlers -----
@@ -87,10 +76,11 @@ export class OpenAPILanguageServer {
   async onDefinition(
     params: DefinitionParams
   ): Promise<DefinitionLink[] | null> {
-    const link = await this.documentReferenceManager.getDefinitionLinkAtPosition(
-      params.textDocument.uri,
-      params.position
-    );
+    const link =
+      await this.documentReferenceManager.getDefinitionLinkAtPosition(
+        params.textDocument.uri,
+        params.position
+      );
     return link ? [link] : null;
   }
 
@@ -101,10 +91,9 @@ export class OpenAPILanguageServer {
 
     if (spec.type !== "openapi") return null;
 
-    const analysis = (await this.cache.compute([
-      "specDocument.analyze",
-      params.textDocument.uri,
-    ])) as Analysis;
+    const analysis = await this.analysisManager.getAnalysis(
+      params.textDocument.uri
+    );
 
     // Try to find definition from $ref
     let definition = null;

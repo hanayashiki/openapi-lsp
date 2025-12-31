@@ -3,43 +3,56 @@ import {
   ModuleResolutionResult,
 } from "./ModuleResolution.js";
 import { ServerDocumentManager } from "./DocumentManager.js";
-import { fastUri } from "fast-uri";
 import { err, ok } from "@openapi-lsp/core/result";
+import {
+  CacheComputeContext,
+  CacheLoader,
+  QueryCache,
+} from "@openapi-lsp/core/queries";
 
 export class Resolver {
-  constructor(private documentManager: ServerDocumentManager) {}
+  loader: CacheLoader<["resolver", ModuleResolutionInput], ModuleResolutionResult>;
+
+  constructor(
+    private documentManager: ServerDocumentManager,
+    cache: QueryCache
+  ) {
+    this.loader = cache.createLoader(
+      async ([_, input], ctx): Promise<ModuleResolutionResult> => {
+        let resolvedUrl: URL;
+        try {
+          // Use native URL for resolution - handles ../ correctly
+          resolvedUrl = new URL(input.ref, input.baseUri);
+        } catch {
+          return err({ type: "invalidUri" });
+        }
+
+        // Strip fragment for file resolution
+        resolvedUrl.hash = "";
+
+        if (resolvedUrl.protocol !== "file:") {
+          return err({
+            type: "unsupportedUriScheme",
+            scheme: resolvedUrl.protocol.replace(/:$/, ""),
+          });
+        }
+
+        const resolvedUri = resolvedUrl.href;
+
+        // Use documentManager.load for proper dependency tracking
+        return ok(await this.documentManager.load(ctx, resolvedUri));
+      }
+    );
+  }
 
   async resolve(input: ModuleResolutionInput): Promise<ModuleResolutionResult> {
-    const refComponent = fastUri.parse(input.ref);
-    refComponent.fragment = undefined;
-
-    if (refComponent.error) {
-      return err({
-        type: "invalidUri",
-      });
-    }
-    const baseComponent = fastUri.parse(input.baseUri);
-    if (baseComponent.error) {
-      throw new Error(
-        `Unexpected error when parsing baseUri: ${input.baseUri}`
-      );
-    }
-    const resolvedUriComponent = fastUri.resolveComponent(
-      baseComponent,
-      refComponent
-    );
-
-    if (resolvedUriComponent.scheme !== "file") {
-      return err({
-        type: "unsupportedUriScheme",
-        scheme: resolvedUriComponent.scheme!,
-      });
-    }
-
-    const resolvedUri = fastUri.serialize(resolvedUriComponent);
-
-    // Currently, the file-resolve method used by stoplight is merely resolving relatively to the importer.
-    // We keep this simple method to stay with the ecosystem.
-    return ok(await this.documentManager.getServerDocument(resolvedUri));
+    return await this.loader.use(["resolver", input]);
   }
+
+  load = (
+    ctx: CacheComputeContext,
+    input: ModuleResolutionInput
+  ): Promise<ModuleResolutionResult> => {
+    return this.loader.load(ctx, ["resolver", input]);
+  };
 }

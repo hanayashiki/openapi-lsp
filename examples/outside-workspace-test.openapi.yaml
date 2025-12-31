@@ -1,0 +1,27 @@
+openapi: 3.0.3
+info:
+  title: Outside Workspace Test
+  version: 1.0.0
+  description: |
+    This file demonstrates references that would be blocked by workspace security.
+    The LSP will return "outsideWorkspace" error for these refs.
+
+paths:
+  /test:
+    get:
+      summary: Test endpoint with outside workspace refs
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                # This ref tries to escape the workspace - will fail with outsideWorkspace error
+                $ref: "../../../etc/passwd"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                # Absolute path outside workspace - will fail
+                $ref: "/tmp/malicious.yaml#/Schema"

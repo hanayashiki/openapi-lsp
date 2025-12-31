@@ -1,10 +1,31 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
+import { fileURLToPath } from "node:url";
 import { ok, err, Result } from "@openapi-lsp/core/result";
 import { VFS, VFSError, GlobEntry, GlobOptions } from "./VFS.js";
+import { Workspace } from "../workspace/Workspace.js";
 
 export class NodeVFS implements VFS {
+  private workspacePaths: string[];
+
+  constructor(workspace: Workspace) {
+    this.workspacePaths = workspace.workspaceFolders.map((folder) =>
+      fileURLToPath(folder.uri)
+    );
+  }
+
+  private isInsideWorkspace(filePath: string): boolean {
+    const normalizedPath = path.resolve(filePath);
+    return this.workspacePaths.some((wsPath) =>
+      normalizedPath.startsWith(path.resolve(wsPath) + path.sep)
+    );
+  }
+
   async readFile(filePath: string): Promise<Result<string, VFSError>> {
+    if (!this.isInsideWorkspace(filePath)) {
+      return err({ type: "outsideWorkspace", path: filePath });
+    }
+
     try {
       const content = await fs.readFile(filePath, "utf-8");
       return ok(content);

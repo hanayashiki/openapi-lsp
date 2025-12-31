@@ -3,6 +3,7 @@ import { Result } from "@openapi-lsp/core/result";
 export type VFSError =
   | { type: "notFound"; path: string }
   | { type: "permissionDenied"; path: string }
+  | { type: "outsideWorkspace"; path: string }
   | { type: "unknown"; path: string; message: string };
 
 export type ReadFileResult = Result<string, VFSError>;

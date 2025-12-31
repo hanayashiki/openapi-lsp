@@ -85,9 +85,6 @@ importers:
       '@openapi-lsp/core':
         specifier: workspace:*
         version: link:../core
-      fast-uri:
-        specifier: ^3.1.0
-        version: 3.1.0
       picomatch:
         specifier: ^4.0.2
         version: 4.0.3
