@@ -8,11 +8,12 @@ import {
 } from "vscode-languageserver/node.js";
 import { TextDocument } from "vscode-languageserver-textdocument";
 import { OpenAPILanguageServer } from "./OpenAPILanaguageServer.js";
+import { NodeVFS } from "./vfs/NodeVFS.js";
 
 const connection = createConnection(ProposedFeatures.all);
 const documents = new TextDocuments(TextDocument);
 
-const server = new OpenAPILanguageServer();
+const server = new OpenAPILanguageServer(documents, new NodeVFS());
 
 connection.onInitialize((_params: InitializeParams): InitializeResult => {
   return {

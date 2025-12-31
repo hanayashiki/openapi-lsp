@@ -1,6 +1,6 @@
 import { OpenAPI } from "@openapi-lsp/core/openapi";
 import { Range } from "vscode-languageserver-textdocument";
-import { SpecDocumentPath } from "./SpecDocument.js";
+import { SpecDocumentPath } from "./ServerDocument.js";
 import { ZodError } from "zod";
 
 export interface Analysis {

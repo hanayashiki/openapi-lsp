@@ -1,5 +1,5 @@
 import { OpenAPI, OpenAPIInput } from "@openapi-lsp/core/openapi";
-import { SpecDocument } from "./SpecDocument.js";
+import { SpecDocument } from "./ServerDocument.js";
 import { Analysis } from "./Analysis.js";
 import { getDefinitions } from "./getDefinitions.js";
 import { ZodError } from "zod";

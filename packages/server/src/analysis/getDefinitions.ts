@@ -4,7 +4,7 @@ import {
   isResponse,
   OpenAPI,
 } from "@openapi-lsp/core/openapi";
-import { SpecDocument } from "./SpecDocument.js";
+import { SpecDocument } from "./ServerDocument.js";
 import { Definition, DefinitionComponent } from "./Analysis.js";
 import { offsetToRange } from "./utils.js";
 import { visit, VisitorInput } from "./Visitor.js";

@@ -30,6 +30,9 @@ const unwrapGetResult = (result: CacheGetResult): CacheEntry => {
   throw new Error("Cache entry missing");
 };
 
+/**
+ * Low-level common caching provider
+ */
 export class QueryCache {
   private inflight = new Map<HashedCacheKey, Promise<CacheValue>>();
   private store = new Map<HashedCacheKey, CacheEntry>();

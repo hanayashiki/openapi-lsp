@@ -15,9 +15,9 @@ import {
   HoverParams,
   MarkupKind,
   TextDocumentChangeEvent,
+  TextDocuments,
 } from "vscode-languageserver";
-import { parseDocument, LineCounter } from "yaml";
-import { SpecDocument } from "./analysis/SpecDocument.js";
+import { SpecDocument } from "./analysis/ServerDocument.js";
 import { analyzeSpecDocument } from "./analysis/analyze.js";
 import { Analysis } from "./analysis/Analysis.js";
 import { getRefByPosition } from "./analysis/getRefByPosition.js";
@@ -33,29 +33,32 @@ import {
 } from "./serialize/index.js";
 import { getDefinitionKeyByPosition } from "./analysis/getDefinitionKeyByPosition.js";
 import { resolveRef } from "./analysis/resolveRef.js";
+import { VFS } from "./vfs/VFS.js";
+import { ServerDocumentManager } from "./analysis/DocumentManager.js";
 
 export class OpenAPILanguageServer {
-  cache = new QueryCache();
+  cache: QueryCache;
+  documentManager: ServerDocumentManager;
 
-  constructor() {}
+  constructor(
+    private documents: TextDocuments<TextDocument>,
+    private vfs: VFS
+  ) {
+    this.cache = new QueryCache();
+    this.documentManager = new ServerDocumentManager(
+      this.documents,
+      this.cache,
+      this.vfs
+    );
+  }
 
   async onDidOpen(event: TextDocumentChangeEvent<TextDocument>) {
-    this.cache.set(["specDocument.yamlAst", event.document.uri], {
-      computeFn: async (): Promise<SpecDocument> => {
-        const lineCounter = new LineCounter();
-        return {
-          type: "openapi",
-          uri: event.document.uri,
-          yamlAst: parseDocument(event.document.getText(), { lineCounter }),
-          lineCounter,
-        };
-      },
-    });
+    this.documentManager.onDidOpen(event.document);
 
     this.cache.set(["specDocument.analyze", event.document.uri], {
       computeFn: async (ctx): Promise<Analysis> => {
         const yamlAst = (await ctx.load([
-          "specDocument.yamlAst",
+          "serverDocument",
           event.document.uri,
         ])) as SpecDocument;
 
@@ -66,17 +69,18 @@ export class OpenAPILanguageServer {
 
   // ----- TextDocuments handlers -----
   async onDidChangeContent(event: TextDocumentChangeEvent<TextDocument>) {
-    this.cache.invalidateByKey(["specDocument.yamlAst", event.document.uri]);
+    this.documentManager.onDidChangeContent(event.document);
   }
 
   // ----- Language features handlers -----
   async onDefinition(
     params: DefinitionParams
   ): Promise<DefinitionLink[] | null> {
-    const spec = (await this.cache.compute([
-      "specDocument.yamlAst",
-      params.textDocument.uri,
-    ])) as SpecDocument;
+    const spec = await this.documentManager.getServerDocument(
+      params.textDocument.uri
+    );
+
+    if (spec.type !== "openapi") return null;
 
     const analysis = (await this.cache.compute([
       "specDocument.analyze",
@@ -105,10 +109,11 @@ export class OpenAPILanguageServer {
   }
 
   async onHover(params: HoverParams): Promise<Hover | null> {
-    const spec = (await this.cache.compute([
-      "specDocument.yamlAst",
-      params.textDocument.uri,
-    ])) as SpecDocument;
+    const spec = await this.documentManager.getServerDocument(
+      params.textDocument.uri
+    );
+
+    if (spec.type !== "openapi") return null;
 
     const analysis = (await this.cache.compute([
       "specDocument.analyze",

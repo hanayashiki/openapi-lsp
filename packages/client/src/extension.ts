@@ -1,10 +1,5 @@
 import * as path from "node:path";
-import {
-  type ExtensionContext,
-  workspace,
-  window,
-  commands,
-} from "vscode";
+import { type ExtensionContext, workspace, window, commands } from "vscode";
 import {
   LanguageClient,
   type LanguageClientOptions,
@@ -36,10 +31,12 @@ export async function activate(context: ExtensionContext): Promise<void> {
       { scheme: "file", language: "openapi" },
       { scheme: "file", pattern: "**/*.openapi.yml" },
       { scheme: "file", pattern: "**/openapi.yml" },
+      { scheme: "file", pattern: "**/*.json" },
+      { scheme: "file", pattern: "**/*.yml" },
     ],
     synchronize: {
       fileEvents: workspace.createFileSystemWatcher(
-        "**/{*.openapi.yml,openapi.yml}"
+        "**/{*.openapi.yml,openapi.yml,*.json,*.yml}"
       ),
     },
   };
@@ -54,7 +51,9 @@ export async function activate(context: ExtensionContext): Promise<void> {
   try {
     await client.start();
   } catch (error) {
-    window.showErrorMessage(`Failed to start OpenAPI Language Server: ${error}`);
+    window.showErrorMessage(
+      `Failed to start OpenAPI Language Server: ${error}`
+    );
   }
 
   context.subscriptions.push({

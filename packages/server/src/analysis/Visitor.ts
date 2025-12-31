@@ -9,7 +9,7 @@ import {
   isNode,
   isSeq,
 } from "yaml";
-import { SpecDocumentPath } from "./SpecDocument.js";
+import { SpecDocumentPath } from "./ServerDocument.js";
 
 export interface VisitInput {
   document: OpenAPI.Document;
