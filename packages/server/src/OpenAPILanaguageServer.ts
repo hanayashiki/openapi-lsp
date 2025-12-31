@@ -34,13 +34,18 @@ import { resolveRef } from "./analysis/resolveRef.js";
 import { VFS } from "./vfs/VFS.js";
 import { ServerDocumentManager } from "./analysis/DocumentManager.js";
 import { Resolver } from "./analysis/Resolver.js";
+import { Workspace } from "./workspace/Workspace.js";
+import { DocumentReferenceManager } from "./analysis/DocumentReferenceManager.js";
 
 export class OpenAPILanguageServer {
   cache: QueryCache;
   documentManager: ServerDocumentManager;
   resolver: Resolver;
+  documentReferenceManager: DocumentReferenceManager;
 
   constructor(
+    // @ts-ignore
+    private _workspace: Workspace,
     private documents: TextDocuments<TextDocument>,
     private vfs: VFS
   ) {
@@ -51,6 +56,11 @@ export class OpenAPILanguageServer {
       this.vfs
     );
     this.resolver = new Resolver(this.documentManager);
+    this.documentReferenceManager = new DocumentReferenceManager(
+      this.documentManager,
+      this.resolver,
+      this.cache
+    );
   }
 
   async onDidOpen(event: TextDocumentChangeEvent<TextDocument>) {
@@ -77,22 +87,11 @@ export class OpenAPILanguageServer {
   async onDefinition(
     params: DefinitionParams
   ): Promise<DefinitionLink[] | null> {
-    const spec = await this.documentManager.getServerDocument(
-      params.textDocument.uri
+    const link = await this.documentReferenceManager.getDefinitionLinkAtPosition(
+      params.textDocument.uri,
+      params.position
     );
-
-    if (spec.type !== "openapi") return null;
-
-    const ref = spec.yaml.getRefAtPosition(params.position);
-    if (!ref) return null;
-
-    const definitionLink = spec.yaml.getDefinitionLinkByRef(
-      ref,
-      params.textDocument.uri
-    );
-    if (!definitionLink) return null;
-
-    return [definitionLink];
+    return link ? [link] : null;
   }
 
   async onHover(params: HoverParams): Promise<Hover | null> {

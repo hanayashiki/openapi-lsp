@@ -2,6 +2,7 @@ import { OpenAPI } from "@openapi-lsp/core/openapi";
 import { Range } from "vscode-languageserver-textdocument";
 import { SpecDocumentPath } from "./ServerDocument.js";
 import { ZodError } from "zod";
+import { ModuleResolutionResult } from "./ModuleResolution.js";
 
 export interface Analysis {
   document: OpenAPI.Document;
@@ -29,4 +30,22 @@ export type Definition = {
   nameRange: Range;
   definitionRange: Range;
   component: DefinitionComponent;
+};
+
+export type Reference = {
+  path: SpecDocumentPath;
+  /**
+   * Range of the `$ref`
+   */
+  refKeyRange: Range;
+
+  /**
+   * Range of the json pointer string
+   */
+  refValueRange: Range;
+
+  /**
+   * The resolution result, might be an error
+   */
+  resolution: ModuleResolutionResult;
 };

@@ -1,0 +1,27 @@
+Product:
+  type: object
+  required:
+    - id
+    - name
+    - price
+  properties:
+    id:
+      type: string
+      format: uuid
+    name:
+      type: string
+    description:
+      type: string
+    price:
+      type: number
+      format: float
+    category:
+      $ref: "#/Category"
+
+Category:
+  type: object
+  properties:
+    id:
+      type: string
+    name:
+      type: string

@@ -39,6 +39,9 @@ importers:
         specifier: ^9.0.1
         version: 9.0.1
     devDependencies:
+      '@openapi-lsp/core':
+        specifier: workspace:*
+        version: link:../core
       '@types/vscode':
         specifier: ^1.85.0
         version: 1.107.0
@@ -57,13 +60,19 @@ importers:
       js-md5:
         specifier: ^0.8.3
         version: 0.8.3
+      picomatch:
+        specifier: ^4.0.3
+        version: 4.0.3
       zod:
         specifier: 'catalog:'
         version: 4.2.1
     devDependencies:
       '@types/js-md5':
-        specifier: ^0.7.2
-        version: 0.7.2
+        specifier: ^0.8.0
+        version: 0.8.0
+      '@types/picomatch':
+        specifier: ^3.0.2
+        version: 3.0.2
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -79,6 +88,9 @@ importers:
       fast-uri:
         specifier: ^3.1.0
         version: 3.1.0
+      picomatch:
+        specifier: ^4.0.2
+        version: 4.0.3
       vscode-languageserver:
         specifier: ^9.0.1
         version: 9.0.1
@@ -92,6 +104,9 @@ importers:
         specifier: 'catalog:'
         version: 4.2.1
     devDependencies:
+      '@types/picomatch':
+        specifier: ^3.0.1
+        version: 3.0.2
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -565,14 +580,17 @@ packages:
   '@types/estree@1.0.8':
     resolution: {integrity: sha512-dWHzHa2WqEXI/O1E9OjrocMTKJl2mSrEolh1Iomrv6U+JuNwaHXsXx9bLu5gG7BUWFIN0skIQJQ/L1rIex4X6w==}
 
-  '@types/js-md5@0.7.2':
-    resolution: {integrity: sha512-IwcFIov1JbiEToo3DgrVEwkMUR1BVlVyLjk245AzGHyyOlyddDFIeSIZO+WlhTortOa4P1PdCS8cDrTl7RW1HA==}
+  '@types/js-md5@0.8.0':
+    resolution: {integrity: sha512-gQkc1Felhyj+aB9jmz/ICLm1fDPQx7l/60JIBSSEC+j09JeaINlzd0Wj9LZlQkHnV5rJYkroOHE5wdbDgADJrw==}
 
   '@types/node@22.19.3':
     resolution: {integrity: sha512-1N9SBnWYOJTrNZCdh/yJE+t910Y128BoyY+zBLWhL3r0TYzlTmFdXrPwHL9DyFZmlEXNQQolTZh3KHV31QDhyA==}
 
   '@types/normalize-package-data@2.4.4':
     resolution: {integrity: sha512-37i+OaWTh9qeK4LSHPsyRC7NahnGotNuZvjLSgcPzblpHB3rrCJxAOgI5gCdKm7coonsaX1Of0ILiTcnZjbfxA==}
+
+  '@types/picomatch@3.0.2':
+    resolution: {integrity: sha512-n0i8TD3UDB7paoMMxA3Y65vUncFJXjcUf7lQY7YyKGl6031FNjfsLs6pdLFCy2GNFxItPJG8GvvpbZc2skH7WA==}
 
   '@types/sarif@2.1.7':
     resolution: {integrity: sha512-kRz0VEkJqWLf1LLVN4pT1cg1Z9wAuvI6L97V3m2f5B76Tg8d413ddvLBPTEHAZJlnn4XSvu0FkZtViCQGVyrXQ==}
@@ -2241,13 +2259,15 @@ snapshots:
 
   '@types/estree@1.0.8': {}
 
-  '@types/js-md5@0.7.2': {}
+  '@types/js-md5@0.8.0': {}
 
   '@types/node@22.19.3':
     dependencies:
       undici-types: 6.21.0
 
   '@types/normalize-package-data@2.4.4': {}
+
+  '@types/picomatch@3.0.2': {}
 
   '@types/sarif@2.1.7': {}
 

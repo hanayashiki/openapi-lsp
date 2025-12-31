@@ -6,6 +6,10 @@ import {
   type ServerOptions,
   TransportKind,
 } from "vscode-languageclient/node.js";
+import {
+  openapiFilePatterns,
+  componentFilePatterns,
+} from "@openapi-lsp/core/constants";
 
 let client: LanguageClient | undefined;
 
@@ -26,18 +30,17 @@ export async function activate(context: ExtensionContext): Promise<void> {
     },
   };
 
+  const allPatterns = [...openapiFilePatterns, ...componentFilePatterns];
+  const documentSelector = [
+    { scheme: "file", language: "openapi" },
+    ...allPatterns.map((pattern) => ({ scheme: "file", pattern: `**/${pattern}` })),
+  ];
+  const fileWatcherPattern = `**/{${allPatterns.join(",")}}`;
+
   const clientOptions: LanguageClientOptions = {
-    documentSelector: [
-      { scheme: "file", language: "openapi" },
-      { scheme: "file", pattern: "**/*.openapi.yml" },
-      { scheme: "file", pattern: "**/openapi.yml" },
-      { scheme: "file", pattern: "**/*.json" },
-      { scheme: "file", pattern: "**/*.yml" },
-    ],
+    documentSelector,
     synchronize: {
-      fileEvents: workspace.createFileSystemWatcher(
-        "**/{*.openapi.yml,openapi.yml,*.json,*.yml}"
-      ),
+      fileEvents: workspace.createFileSystemWatcher(fileWatcherPattern),
     },
   };
 

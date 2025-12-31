@@ -1,0 +1,22 @@
+UserId:
+  name: id
+  in: path
+  required: true
+  description: User ID
+  schema:
+    type: string
+    format: uuid
+
+Pagination:
+  - name: page
+    in: query
+    description: Page number
+    schema:
+      type: integer
+      default: 1
+  - name: limit
+    in: query
+    description: Items per page
+    schema:
+      type: integer
+      default: 20

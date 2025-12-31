@@ -15,6 +15,12 @@ import {
   isLocalPointer,
 } from "@openapi-lsp/core/json-pointer";
 
+export type CollectedRef = {
+  ref: string;
+  keyRange: Range;
+  pointerRange: Range;
+};
+
 export class YamlDocument {
   constructor(
     public readonly ast: Document,
@@ -80,6 +86,18 @@ export class YamlDocument {
 
     const pathSegments = parseResult.data;
 
+    // Handle root reference (empty path = whole document)
+    if (pathSegments.length === 0) {
+      const rootRange = this.ast.contents?.range;
+      if (!rootRange) return null;
+      const range = this.toTextDocumentRange(rootRange);
+      return {
+        targetUri,
+        targetRange: range,
+        targetSelectionRange: range,
+      };
+    }
+
     let currentNode: Node | null = this.ast.contents;
     let keyNode: Scalar | null = null;
 
@@ -102,5 +120,27 @@ export class YamlDocument {
       targetRange: this.toTextDocumentRange(currentNode.range),
       targetSelectionRange: this.toTextDocumentRange(keyNode.range),
     };
+  }
+
+  collectRefs(): CollectedRef[] {
+    let refs: CollectedRef[] = [];
+
+    visit(this.ast, {
+      Map: (_key, node) => {
+        const refPair = node.items.find(
+          (pair) => isScalar(pair.key) && pair.key.value === "$ref"
+        );
+        if (refPair && isScalar(refPair.key) && isScalar(refPair.value)) {
+          refs.push({
+            ref: String(refPair.value.value),
+            keyRange: this.toTextDocumentRange(refPair.key.range!),
+            pointerRange: this.toTextDocumentRange(refPair.value.range!),
+          });
+        }
+        return undefined;
+      },
+    });
+
+    return refs;
   }
 }

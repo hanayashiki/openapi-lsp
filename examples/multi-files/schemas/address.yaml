@@ -1,0 +1,11 @@
+Address:
+  type: object
+  properties:
+    street:
+      type: string
+    city:
+      type: string
+    country:
+      type: string
+    postalCode:
+      type: string

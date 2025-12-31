@@ -1,0 +1,54 @@
+Order:
+  type: object
+  required:
+    - id
+    - userId
+    - items
+    - status
+  properties:
+    id:
+      type: string
+      format: uuid
+    userId:
+      type: string
+      format: uuid
+    items:
+      type: array
+      items:
+        $ref: "#/OrderItem"
+    status:
+      type: string
+      enum:
+        - pending
+        - confirmed
+        - shipped
+        - delivered
+    createdAt:
+      type: string
+      format: date-time
+
+OrderItem:
+  type: object
+  required:
+    - productId
+    - quantity
+  properties:
+    productId:
+      type: string
+      format: uuid
+    quantity:
+      type: integer
+      minimum: 1
+    price:
+      type: number
+      format: float
+
+CreateOrderRequest:
+  type: object
+  required:
+    - items
+  properties:
+    items:
+      type: array
+      items:
+        $ref: "#/OrderItem"

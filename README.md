@@ -15,12 +15,13 @@ VS Code extension providing language support for OpenAPI specifications.
 ## Supported Files
 
 - `*.openapi.yml`
+- `*.openapi.yaml`
 - `openapi.yml`
+- `openapi.yaml`
 
 ## Limitations
 
 - OpenAPI >= 3.0.0
-- `$ref` is local only
 
 ## Contributors
 

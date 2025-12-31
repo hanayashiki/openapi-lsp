@@ -1,0 +1,89 @@
+openapi: 3.0.3
+info:
+  title: Multi-file Example API
+  version: 1.0.0
+  description: Example API demonstrating external $ref resolution
+
+paths:
+  /users:
+    get:
+      summary: List all users
+      operationId: listUsers
+      responses:
+        "200":
+          description: A list of users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "./schemas/user.yaml#/User"
+        "400":
+          $ref: "./responses/errors.yaml#/BadRequest"
+        "500":
+          $ref: "./responses/errors.yaml#/InternalError"
+
+    post:
+      summary: Create a new user
+      operationId: createUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "./schemas/user.yaml#/CreateUserRequest"
+      responses:
+        "201":
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: "./schemas/user.yaml#/User"
+
+  /users/{id}:
+    get:
+      summary: Get user by ID
+      operationId: getUserById
+      parameters:
+        - $ref: "./parameters/common.yaml#/UserId"
+      responses:
+        "200":
+          description: User found
+          content:
+            application/json:
+              schema:
+                $ref: "./schemas/user.yaml#/User"
+        "404":
+          $ref: "./responses/errors.yaml#/NotFound"
+
+  /products:
+    get:
+      summary: List all products
+      operationId: listProducts
+      responses:
+        "200":
+          description: A list of products
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "./schemas/product.yaml#/Product"
+
+  /orders:
+    post:
+      summary: Create an order
+      operationId: createOrder
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "./schemas/order.yaml#/CreateOrderRequest"
+      responses:
+        "201":
+          description: Order created
+          content:
+            application/json:
+              schema:
+                $ref: "./schemas/order.yaml#/Order"

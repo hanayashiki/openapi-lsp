@@ -4,7 +4,9 @@ export type JsonPointerError =
   | { type: "invalidSyntax"; message: string }
   | { type: "invalidEscape"; message: string };
 
-export type JsonPointerResult = Result<string[], JsonPointerError>;
+export type JsonPointerResult = Result<JsonPointer, JsonPointerError>;
+
+export type JsonPointer = string[];
 
 /**
  * Decode a single JSON Pointer reference token per RFC 6901

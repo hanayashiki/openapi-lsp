@@ -9,13 +9,44 @@ import {
 import { TextDocument } from "vscode-languageserver-textdocument";
 import { OpenAPILanguageServer } from "./OpenAPILanaguageServer.js";
 import { NodeVFS } from "./vfs/NodeVFS.js";
+import { pathToFileURL } from "url";
 
 const connection = createConnection(ProposedFeatures.all);
 const documents = new TextDocuments(TextDocument);
 
-const server = new OpenAPILanguageServer(documents, new NodeVFS());
+connection.onInitialize((params: InitializeParams): InitializeResult => {
+  const server = new OpenAPILanguageServer(
+    {
+      workspaceFolders:
+        params.workspaceFolders ?? /** Fallback using deprecated rootUri, then use current working path */ [
+          {
+            name: "Root",
+            uri:
+              params.rootUri ??
+              pathToFileURL(params.rootPath ?? process.cwd()).toString(),
+          },
+        ],
+    },
+    documents,
+    new NodeVFS()
+  );
 
-connection.onInitialize((_params: InitializeParams): InitializeResult => {
+  connection.onDefinition(async (params) => {
+    return server.onDefinition(params);
+  });
+
+  connection.onHover(async (params) => {
+    return server.onHover(params);
+  });
+
+  documents.onDidOpen((change) => {
+    server.onDidOpen(change);
+  });
+
+  documents.onDidChangeContent((change) => {
+    server.onDidChangeContent(change);
+  });
+
   return {
     capabilities: {
       textDocumentSync: TextDocumentSyncKind.Incremental,
@@ -31,22 +62,6 @@ connection.onInitialize((_params: InitializeParams): InitializeResult => {
 
 connection.onInitialized(() => {
   console.log("OpenAPI Language Server initialized");
-});
-
-connection.onDefinition(async (params) => {
-  return server.onDefinition(params);
-});
-
-connection.onHover(async (params) => {
-  return server.onHover(params);
-});
-
-documents.onDidOpen((change) => {
-  server.onDidOpen(change);
-});
-
-documents.onDidChangeContent((change) => {
-  server.onDidChangeContent(change);
 });
 
 documents.listen(connection);

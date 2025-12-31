@@ -6,7 +6,7 @@
   },
   "displayName": "OpenAPI LSP",
   "description": "Language support for OpenAPI/Swagger specifications",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "publisher": "hanayashiki",
   "license": "MIT",
   "icon": "icons/plugin-icon.png",
@@ -26,10 +26,12 @@
           "Swagger"
         ],
         "extensions": [
-          ".openapi.yml"
+          ".openapi.yml",
+          ".openapi.yaml"
         ],
         "filenames": [
-          "openapi.yml"
+          "openapi.yml",
+          "openapi.yaml"
         ],
         "configuration": "./language-configuration.json",
         "icon": {
@@ -52,6 +54,12 @@
       }
     ]
   },
+  "activationEvents": [
+    "workspaceContains:**/*.openapi.yml",
+    "workspaceContains:**/*.openapi.yaml",
+    "workspaceContains:**/openapi.yml",
+    "workspaceContains:**/openapi.yaml"
+  ],
   "scripts": {
     "bundle": "node esbuild.mjs",
     "watch": "node esbuild.mjs --watch",
@@ -68,6 +76,7 @@
     "@types/vscode": "^1.85.0",
     "@vscode/vsce": "^3.2.1",
     "esbuild": "catalog:",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "@openapi-lsp/core": "workspace:*"
   }
 }

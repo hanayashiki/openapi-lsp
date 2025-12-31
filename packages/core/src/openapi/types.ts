@@ -535,5 +535,3 @@ export namespace OpenAPI {
   export type Info = z.infer<typeof Info>;
   export type Document = z.infer<typeof Document>;
 }
-
-export type JSONPointerZod = string & { __jsonPointer?: true };
