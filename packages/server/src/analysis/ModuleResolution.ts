@@ -15,7 +15,13 @@ export type ModuleResolution =
     };
 
 export type ModuleResolutionInput = {
+  /**
+   * The $ref to resolve, fragment ignored.
+   */
   ref: string;
+  /**
+   * The containing file's URI
+   */
   baseUri: string;
 };
 

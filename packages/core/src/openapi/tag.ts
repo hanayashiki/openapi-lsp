@@ -35,14 +35,23 @@ export const OpenAPITag = z.enum([
 
 export type OpenAPITag = z.infer<typeof OpenAPITag>;
 
-const tagStorage = new WeakMap<object, OpenAPITag>();
+const tagStorage = new WeakMap<object, Set<OpenAPITag>>();
+
+const addTag = (obj: object, tag: OpenAPITag): void => {
+  const existing = tagStorage.get(obj);
+  if (existing) {
+    existing.add(tag);
+  } else {
+    tagStorage.set(obj, new Set([tag]));
+  }
+};
 
 export const TaggedObject = <T extends core.$ZodLooseShape>(
   shape: T,
   tag: OpenAPITag
 ): ZodObject<util.Writeable<T>, core.$strip> => {
   return z.object(shape).transform((value) => {
-    tagStorage.set(value, tag);
+    addTag(value, tag);
     return value;
   }) as never;
 };
@@ -52,16 +61,21 @@ export const TaggedRecord = <T extends core.SomeType>(
   tag: OpenAPITag,
 ): ZodRecord<ZodString, T> => {
   return z.record(z.string(), value).transform((value) => {
-    tagStorage.set(value, tag);
+    addTag(value, tag);
     return value;
   }) as never;
 };
 
-export const getOpenAPITag = (obj: object): OpenAPITag | undefined => {
-  return tagStorage.get(obj);
+export const hasOpenAPITag = (obj: object, tag: OpenAPITag): boolean => {
+  return tagStorage.get(obj)?.has(tag) ?? false;
+};
+
+export const getOpenAPITags = (obj: object): OpenAPITag[] => {
+  const tags = tagStorage.get(obj);
+  return tags ? [...tags] : [];
 };
 
 // Helper for manually tagging objects (used for recursive types with z.lazy)
 export const setOpenAPITag = (obj: object, tag: OpenAPITag): void => {
-  tagStorage.set(obj, tag);
+  addTag(obj, tag);
 };

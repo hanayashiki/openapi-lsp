@@ -11,6 +11,8 @@ export class Resolver {
 
   async resolve(input: ModuleResolutionInput): Promise<ModuleResolutionResult> {
     const refComponent = fastUri.parse(input.ref);
+    refComponent.fragment = undefined;
+
     if (refComponent.error) {
       return err({
         type: "invalidUri",

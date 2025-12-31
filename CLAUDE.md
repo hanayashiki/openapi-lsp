@@ -87,7 +87,7 @@ VS Code Client ←→ LSP Server ←→ QueryCache ←→ Language Features (hov
 ## Key Patterns
 
 - **Typebox schemas** with fallback codecs allow graceful handling of partially valid OpenAPI specs
-- **TaggedObject** wraps each OpenAPI type to enable runtime type identification via `getOpenAPITag()`
+- **TaggedObject** wraps each OpenAPI type to enable runtime type identification via `hasOpenAPITag(obj, tag)`. Tags are stored in a `Set`, allowing objects to accumulate multiple tags when used in different contexts (intersection types). Use `getOpenAPITags(obj)` to retrieve all tags.
 - **QueryCache** tracks dependencies and automatically invalidates downstream results when sources change
 - **Result types** (`Ok`/`Err`) used throughout for type-safe error handling - use `andThen` for chaining
 - **ESM modules** only - no CommonJS

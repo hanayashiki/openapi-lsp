@@ -1,4 +1,4 @@
-import { getOpenAPITag, OpenAPI } from "@openapi-lsp/core/openapi";
+import { getOpenAPITags, OpenAPI } from "@openapi-lsp/core/openapi";
 import {
   Document as YamlDocument,
   Node,
@@ -133,17 +133,19 @@ const _visit = ({
       const nextPath = [...currentPath, key];
 
       if (nextOpenAPINode && typeof nextOpenAPINode === "object") {
-        const tag = getOpenAPITag(nextOpenAPINode);
-        if (tag && isMap(nextAstNode)) {
-          visitor[tag]?.({
-            openapiNode: nextOpenAPINode as any,
-            ast: {
-              path: nextPath,
-              astNode: nextAstNode,
-              keyNode: pair.key,
-            },
-            parent: currentLink,
-          });
+        const tags = getOpenAPITags(nextOpenAPINode);
+        if (tags.length > 0 && isMap(nextAstNode)) {
+          for (const tag of tags) {
+            visitor[tag]?.({
+              openapiNode: nextOpenAPINode as any,
+              ast: {
+                path: nextPath,
+                astNode: nextAstNode,
+                keyNode: pair.key,
+              },
+              parent: currentLink,
+            });
+          }
         }
 
         _visit({
@@ -169,17 +171,19 @@ const _visit = ({
       const nextPath = [...currentPath, i];
 
       if (nextOpenAPINode && typeof nextOpenAPINode === "object") {
-        const tag = getOpenAPITag(nextOpenAPINode);
+        const tags = getOpenAPITags(nextOpenAPINode);
 
-        if (tag && isMap(nextAstNode)) {
-          visitor[tag]?.({
-            openapiNode: nextOpenAPINode as any,
-            ast: {
-              path: nextPath,
-              astNode: nextAstNode,
-            },
-            parent: currentLink,
-          });
+        if (tags.length > 0 && isMap(nextAstNode)) {
+          for (const tag of tags) {
+            visitor[tag]?.({
+              openapiNode: nextOpenAPINode as any,
+              ast: {
+                path: nextPath,
+                astNode: nextAstNode,
+              },
+              parent: currentLink,
+            });
+          }
         }
 
         _visit({
