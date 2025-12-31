@@ -2,6 +2,7 @@ import { QueryCache } from "@openapi-lsp/core/queries";
 import { fileURLToPath } from "node:url";
 import { LineCounter, parseDocument } from "yaml";
 import { ServerDocument } from "./ServerDocument.js";
+import { YamlDocument } from "./YamlDocument.js";
 import { TextDocument } from "vscode-languageserver-textdocument";
 import { TextDocuments } from "vscode-languageserver/node.js";
 import { VFS, VFSError } from "../vfs/VFS.js";
@@ -28,12 +29,12 @@ export class ServerDocumentManager {
 
         if (textResult.success) {
           const lineCounter = new LineCounter();
+          const ast = parseDocument(textResult.data, { lineCounter });
 
           return {
             type: "openapi",
             uri,
-            yamlAst: parseDocument(textResult.data, { lineCounter }),
-            lineCounter,
+            yaml: new YamlDocument(ast, lineCounter),
           };
         } else {
           return {

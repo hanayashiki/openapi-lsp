@@ -1,4 +1,4 @@
-import { Document as YamlDocument, LineCounter } from "yaml";
+import { YamlDocument } from "./YamlDocument.js";
 
 export type SpecDocumentPath = (string | number)[];
 
@@ -10,13 +10,12 @@ export type BaseSpecDocument<T extends SpecDocumentType> = {
 };
 
 export type SpecDocument = BaseSpecDocument<"openapi"> & {
-  yamlAst: YamlDocument;
-  lineCounter: LineCounter;
+  yaml: YamlDocument;
 };
 
 /**
  * A document that is deleted
  */
-export type TombDocument = BaseSpecDocument<'tomb'>;
+export type TombDocument = BaseSpecDocument<"tomb">;
 
 export type ServerDocument = SpecDocument | TombDocument;

@@ -9,7 +9,7 @@ export const analyzeSpecDocument = async (
 ): Promise<Analysis> => {
   try {
     // Try strict parsing first
-    const document = OpenAPI.Document.parse(spec.yamlAst.toJS());
+    const document = OpenAPI.Document.parse(spec.yaml.ast.toJS());
 
     return {
       document,
@@ -19,7 +19,7 @@ export const analyzeSpecDocument = async (
   } catch (e) {
     if (e instanceof ZodError) {
       const document = OpenAPIInput.Document.parse(
-        spec.yamlAst.toJS()
+        spec.yaml.ast.toJS()
       );
 
       return {

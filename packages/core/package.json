@@ -7,7 +7,8 @@
   "exports": {
     "./openapi": "./src/openapi/index.ts",
     "./queries": "./src/queries/index.ts",
-    "./result": "./src/result/index.ts"
+    "./result": "./src/result/index.ts",
+    "./json-pointer": "./src/json-pointer/index.ts"
   },
   "scripts": {
     "test": "vitest run",

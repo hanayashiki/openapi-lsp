@@ -20,8 +20,6 @@ import {
 import { SpecDocument } from "./analysis/ServerDocument.js";
 import { analyzeSpecDocument } from "./analysis/analyze.js";
 import { Analysis } from "./analysis/Analysis.js";
-import { getRefByPosition } from "./analysis/getRefByPosition.js";
-import { parseLocalRef } from "./analysis/parseLocalRef.js";
 import {
   serializeSchemaToMarkdown,
   serializeRequestBodyToMarkdown,
@@ -85,30 +83,16 @@ export class OpenAPILanguageServer {
 
     if (spec.type !== "openapi") return null;
 
-    const analysis = (await this.cache.compute([
-      "specDocument.analyze",
-      params.textDocument.uri,
-    ])) as Analysis;
-
-    const ref = getRefByPosition(spec, params.position);
+    const ref = spec.yaml.getRefAtPosition(params.position);
     if (!ref) return null;
 
-    const path = parseLocalRef(ref.$ref);
-    if (!path) return null;
-
-    const definition = analysis.definitions.find(
-      (d) =>
-        d.path.length === path.length && d.path.every((p, i) => p === path[i])
+    const definitionLink = spec.yaml.getDefinitionLinkByRef(
+      ref,
+      params.textDocument.uri
     );
-    if (!definition) return null;
+    if (!definitionLink) return null;
 
-    return [
-      {
-        targetUri: params.textDocument.uri,
-        targetRange: definition.definitionRange,
-        targetSelectionRange: definition.nameRange,
-      },
-    ];
+    return [definitionLink];
   }
 
   async onHover(params: HoverParams): Promise<Hover | null> {
@@ -125,9 +109,9 @@ export class OpenAPILanguageServer {
 
     // Try to find definition from $ref
     let definition = null;
-    const ref = getRefByPosition(spec, params.position);
-    if (ref) {
-      definition = resolveRef(ref, analysis);
+    const refStr = spec.yaml.getRefAtPosition(params.position);
+    if (refStr) {
+      definition = resolveRef({ $ref: refStr }, analysis);
     }
 
     // If not on a $ref, check if on a component key

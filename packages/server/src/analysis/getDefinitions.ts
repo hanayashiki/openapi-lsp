@@ -6,7 +6,6 @@ import {
 } from "@openapi-lsp/core/openapi";
 import { SpecDocument } from "./ServerDocument.js";
 import { Definition, DefinitionComponent } from "./Analysis.js";
-import { offsetToRange } from "./utils.js";
 import { visit, VisitorInput } from "./Visitor.js";
 
 const createDefinitionCollector = (
@@ -32,8 +31,8 @@ const createDefinitionCollector = (
     definitions.push({
       path: ast.path,
       name,
-      nameRange: offsetToRange(spec.lineCounter, ast.keyNode.range),
-      definitionRange: offsetToRange(spec.lineCounter, ast.astNode.range),
+      nameRange: spec.yaml.toTextDocumentRange(ast.keyNode.range),
+      definitionRange: spec.yaml.toTextDocumentRange(ast.astNode.range),
       component: openapiNode,
     });
   };
@@ -48,7 +47,7 @@ export const getDefinitions = (
   const collector = createDefinitionCollector(spec, definitions);
 
   visit(
-    { document: openapi, yamlAst: spec.yamlAst },
+    { document: openapi, yamlAst: spec.yaml.ast },
     {
       Schema: collector,
       Response: collector,
