@@ -9,7 +9,8 @@
     "./queries": "./src/queries/index.ts",
     "./result": "./src/result/index.ts",
     "./json-pointer": "./src/json-pointer/index.ts",
-    "./constants": "./src/constants/index.ts"
+    "./constants": "./src/constants/index.ts",
+    "./solver": "./src/solver/index.ts"
   },
   "scripts": {
     "test": "vitest run",
