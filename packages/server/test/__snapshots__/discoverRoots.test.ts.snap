@@ -23,6 +23,12 @@ exports[`discoverRoots > should discover ring reference and compute SCCs 1`] = `
       "file:///workspace/schemas/NodeA.yaml",
     },
   },
+  "groupIncomingEdges": Map {
+    "file:///workspace/openapi.yaml" => Set {},
+    "file:///workspace/schemas/NodeA.yaml" => Set {
+      "file:///workspace/openapi.yaml",
+    },
+  },
   "uriToAnalysisGroupId": Map {
     "file:///workspace/schemas/NodeA.yaml" => "file:///workspace/schemas/NodeA.yaml",
     "file:///workspace/schemas/NodeC.yaml" => "file:///workspace/schemas/NodeA.yaml",
@@ -42,6 +48,15 @@ exports[`discoverRoots > should handle linear references without SCCs 1`] = `
       "file:///workspace/schemas/B.yaml",
     },
     "file:///workspace/schemas/B.yaml" => Set {},
+  },
+  "groupIncomingEdges": Map {
+    "file:///workspace/openapi.yaml" => Set {},
+    "file:///workspace/schemas/A.yaml" => Set {
+      "file:///workspace/openapi.yaml",
+    },
+    "file:///workspace/schemas/B.yaml" => Set {
+      "file:///workspace/schemas/A.yaml",
+    },
   },
   "uriToAnalysisGroupId": Map {},
 }

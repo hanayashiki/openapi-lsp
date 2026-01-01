@@ -1,4 +1,5 @@
 import { OpenAPI } from "@openapi-lsp/core/openapi";
+import { SolveResult } from "@openapi-lsp/core/solver";
 import { Range } from "vscode-languageserver-textdocument";
 import { SpecDocumentPath } from "./ServerDocument.js";
 import { ZodError } from "zod";
@@ -71,6 +72,14 @@ export type DocumentConnectivity = {
   analysisGroups: Map<string, Set<string>>;
 
   uriToAnalysisGroupId: Map<string, string>;
+
+  /**
+   * Incoming edges for each group (including single-file groups).
+   * Group ID -> Set of Group IDs that reference this group.
+   *
+   * For single-file groups, the group ID is the URI itself.
+   */
+  groupIncomingEdges: Map<string, Set<string>>;
 };
 
 export namespace DocumentConnectivity {
@@ -79,6 +88,23 @@ export namespace DocumentConnectivity {
       graph: new Map(),
       analysisGroups: new Map(),
       uriToAnalysisGroupId: new Map(),
+      groupIncomingEdges: new Map(),
     };
   };
+
+  /**
+   * Get group ID for a URI. Single-file groups use the URI itself.
+   */
+  export const getGroupId = (dc: DocumentConnectivity, uri: string): string =>
+    dc.uriToAnalysisGroupId.get(uri) ?? uri;
 }
+
+/**
+ * Result of analyzing a group (SCC) of documents.
+ * Contains the solver result which can be used for type queries and
+ * provides outgoing types/nominals for downstream groups.
+ */
+export type GroupAnalysisResult = {
+  groupId: string;
+  solveResult: SolveResult;
+};

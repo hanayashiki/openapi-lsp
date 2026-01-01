@@ -28,11 +28,15 @@ export type JSONType =
  * Represents a JSON literal structure with $ref extensions.
  * Note: Composite types (array/object) reference child nodes by NodeId,
  * not nested LocalShape. Each JSON path should have its own node.
+ *
+ * Arrays and objects both use `fields: Record<string, NodeId>` - arrays
+ * use stringified indices as keys. The `kind` tag differentiates them
+ * so they can't unify together.
  */
 export type LocalShape =
   | { kind: "prim"; value: string | null | boolean | number }
   | { kind: "ref"; target: NodeId }
-  | { kind: "array"; elem: NodeId }
+  | { kind: "array"; fields: Record<string, NodeId> }
   | { kind: "object"; fields: Record<string, NodeId> };
 
 /**

@@ -195,15 +195,14 @@ export class Solver {
         nominal: null,
       };
 
-      // Check for nominal conflicts and assign nominal from local nodes
+      // Check for nominal conflicts and assign nominal
       let firstNominal: { node: NodeId; nominal: NominalId } | null = null;
 
       for (const node of nodeSet) {
         ctx.nodeToClass.set(node, classId);
 
-        // Skip external nodes for nominal checking
-        if (ctx.externalNodes.has(node)) continue;
-
+        // Check nominals for all nodes (including external nodes)
+        // External nodes can have nominals from outgoingNominals
         const nominal = ctx.nominals.get(node);
         if (nominal) {
           if (firstNominal === null) {
@@ -359,8 +358,14 @@ export class Solver {
       case "prim":
         return { kind: "prim", prim: this.inferPrimType(shape.value) };
       case "array": {
-        const elemType = this.getNodeType(ctx, shape.elem);
-        return { kind: "array", elem: elemType };
+        // Array fields are indexed by stringified integers
+        // For JSONType, we unify all elements into a single elem type
+        const elemTypes = Object.values(shape.fields).map((nodeId) =>
+          this.getNodeType(ctx, nodeId)
+        );
+        // Unify all element types (for now, just take first or typevar)
+        const elem = elemTypes.length > 0 ? elemTypes[0] : { kind: "typevar" as const };
+        return { kind: "array", elem };
       }
       case "object": {
         const fields: Record<string, JSONType> = {};
@@ -393,8 +398,9 @@ export class Solver {
       .map((nodeId) => ctx.nodes.get(nodeId))
       .filter((shape): shape is LocalShape => shape !== undefined)
       .flatMap((shape) => {
-        if (shape.kind === "object") return Object.values(shape.fields);
-        if (shape.kind === "array") return [shape.elem];
+        if (shape.kind === "object" || shape.kind === "array") {
+          return Object.values(shape.fields);
+        }
         return [];
       });
 

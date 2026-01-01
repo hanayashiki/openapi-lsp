@@ -7,7 +7,7 @@
  */
 
 import { z } from "zod";
-import { setOpenAPITag, TaggedObject, TaggedRecord } from "./tag.js";
+import { setOpenAPITag, TaggedObject, TaggedRecord, TaggedReference } from "./tag.js";
 
 // ------------------------------------------------------------------------------
 // OpenAPI Namespace
@@ -188,7 +188,7 @@ export namespace OpenAPI {
 
   // Helper to create "Schema | Reference" union for use inside Schema
   const SchemaOrRef: z.ZodType<SchemaType | Reference> = z.lazy(() =>
-    z.union([Reference, Schema])
+    z.union([TaggedReference("Schema"), Schema])
   );
 
   export const Schema: z.ZodType<SchemaType> = z.lazy(() =>
@@ -246,16 +246,16 @@ export namespace OpenAPI {
   // ===========================================================================
 
   // Helper to create "Schema | Reference" union for use outside Schema
-  const SchemaOrReference = z.union([Reference, Schema]);
-  const ExampleOrReference = z.union([Reference, Example]);
+  const SchemaOrReference = z.union([TaggedReference("Schema"), Schema]);
+  const ExampleOrReference = z.union([TaggedReference("Example"), Example]);
 
   // Encoding Object
   export const Encoding = TaggedObject(
     {
       contentType: z.string().optional(),
-      // Note: headers will be defined with HeaderOrR/eference after Header is defined
+      // Note: headers will be defined with HeaderOrReference after Header is defined
       headers: z
-        .record(z.string(), z.union([Reference, z.unknown()]))
+        .record(z.string(), z.union([TaggedReference("Header"), z.unknown()]))
         .optional(),
       style: z.string().optional(),
       explode: z.boolean().optional(),
@@ -295,7 +295,7 @@ export namespace OpenAPI {
     "Header"
   );
 
-  const HeaderOrReference = z.union([Reference, Header]);
+  const HeaderOrReference = z.union([TaggedReference("Header"), Header]);
 
   // Link Object
   export const Link = TaggedObject(
@@ -310,7 +310,7 @@ export namespace OpenAPI {
     "Link"
   );
 
-  const LinkOrReference = z.union([Reference, Link]);
+  const LinkOrReference = z.union([TaggedReference("Link"), Link]);
 
   // Response Object
   export const Response = TaggedObject(
@@ -323,7 +323,7 @@ export namespace OpenAPI {
     "Response"
   );
 
-  const ResponseOrReference = z.union([Reference, Response]);
+  const ResponseOrReference = z.union([TaggedReference("Response"), Response]);
 
   // Parameter Object
   export const Parameter = TaggedObject(
@@ -350,7 +350,7 @@ export namespace OpenAPI {
     "Parameter"
   );
 
-  const ParameterOrReference = z.union([Reference, Parameter]);
+  const ParameterOrReference = z.union([TaggedReference("Parameter"), Parameter]);
 
   // Request Body Object
   export const RequestBody = TaggedObject(
@@ -362,7 +362,7 @@ export namespace OpenAPI {
     "RequestBody"
   );
 
-  const RequestBodyOrReference = z.union([Reference, RequestBody]);
+  const RequestBodyOrReference = z.union([TaggedReference("RequestBody"), RequestBody]);
 
   // Security Scheme Object
   export const SecurityScheme = TaggedObject(
@@ -386,7 +386,7 @@ export namespace OpenAPI {
     "SecurityScheme"
   );
 
-  const SecuritySchemeOrReference = z.union([Reference, SecurityScheme]);
+  const SecuritySchemeOrReference = z.union([TaggedReference("SecurityScheme"), SecurityScheme]);
 
   // ===========================================================================
   // Layer 5: Operation-level types
@@ -431,12 +431,12 @@ export namespace OpenAPI {
     "PathItem"
   );
 
-  const PathItemOrReference = z.union([Reference, PathItem]);
+  const PathItemOrReference = z.union([TaggedReference("PathItem"), PathItem]);
 
   // Callback Object
   export const Callback = z.record(z.string(), PathItemOrReference);
 
-  const CallbackOrReference = z.union([Reference, Callback]);
+  const CallbackOrReference = z.union([TaggedReference("Callback"), Callback]);
 
   // ===========================================================================
   // Layer 6: Components

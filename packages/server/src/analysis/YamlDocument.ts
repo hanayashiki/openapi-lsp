@@ -7,13 +7,17 @@ import {
   visit,
   isScalar,
   isMap,
+  isSeq,
 } from "yaml";
 import { Position, Range } from "vscode-languageserver-textdocument";
 import { DefinitionLink } from "vscode-languageserver";
 import {
   parseJsonPointer,
   isLocalPointer,
+  uriWithJsonPointerLoose,
+  JsonPointerLoose,
 } from "@openapi-lsp/core/json-pointer";
+import { LocalShape, NodeId } from "@openapi-lsp/core/solver";
 
 export type CollectedRef = {
   ref: string;
@@ -142,5 +146,56 @@ export class YamlDocument {
     });
 
     return refs;
+  }
+
+  /**
+   * Collect LocalShape for all nodes in the document.
+   * Traverses the YAML AST and creates shapes for primitives, arrays, objects, and refs.
+   */
+  collectLocalShapes(uri: string): Map<NodeId, LocalShape> {
+    const shapes = new Map<NodeId, LocalShape>();
+
+    const visitNode = (node: Node | null, path: JsonPointerLoose): void => {
+      if (!node) return;
+      const nodeId = uriWithJsonPointerLoose(uri, path);
+
+      if (isScalar(node)) {
+        shapes.set(nodeId, {
+          kind: "prim",
+          value: node.value as string | number | boolean | null,
+        });
+      } else if (isSeq(node)) {
+        const fields: Record<string, NodeId> = {};
+        for (let i = 0; i < node.items.length; i++) {
+          const childPath = [...path, i];
+          fields[String(i)] = uriWithJsonPointerLoose(uri, childPath);
+          visitNode(node.items[i] as Node, childPath);
+        }
+        shapes.set(nodeId, { kind: "array", fields });
+      } else if (isMap(node)) {
+        // Check for $ref first
+        const refPair = node.items.find(
+          (pair) => isScalar(pair.key) && pair.key.value === "$ref"
+        );
+        if (refPair && isScalar(refPair.value)) {
+          const targetNodeId = new URL(String(refPair.value.value), uri).toString();
+          shapes.set(nodeId, { kind: "ref", target: targetNodeId });
+        } else {
+          const fields: Record<string, NodeId> = {};
+          for (const pair of node.items) {
+            if (isScalar(pair.key)) {
+              const key = String(pair.key.value);
+              const childPath = [...path, key];
+              fields[key] = uriWithJsonPointerLoose(uri, childPath);
+              visitNode(pair.value as Node, childPath);
+            }
+          }
+          shapes.set(nodeId, { kind: "object", fields });
+        }
+      }
+    };
+
+    visitNode(this.ast.contents, []);
+    return shapes;
   }
 }

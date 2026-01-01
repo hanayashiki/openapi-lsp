@@ -3,12 +3,23 @@ import {
   CacheLoader,
   QueryCache,
 } from "@openapi-lsp/core/queries";
+import {
+  Solver,
+  LocalShape,
+  NodeId,
+  NominalId,
+  JSONType,
+} from "@openapi-lsp/core/solver";
 import { ServerDocumentManager } from "./DocumentManager.js";
-import { ParseResult } from "./Analysis.js";
+import {
+  ParseResult,
+  DocumentConnectivity,
+  GroupAnalysisResult,
+} from "./Analysis.js";
 import { parseSpecDocument } from "./analyze.js";
+import { extractNodes } from "./extractNodes.js";
 import { Workspace } from "../workspace/Workspace.js";
 import { VFS } from "../vfs/VFS.js";
-import { DocumentConnectivity } from "./Analysis.js";
 import { md5 } from "js-md5";
 import { fileURLToPath, pathToFileURL } from "url";
 import { openapiFilePatterns } from "@openapi-lsp/core/constants";
@@ -19,6 +30,10 @@ export class AnalysisManager {
   documentConnectivityLoader: CacheLoader<
     ["documentConnectivity"],
     DocumentConnectivity
+  >;
+  groupAnalysisLoader: CacheLoader<
+    ["groupAnalysis", string],
+    GroupAnalysisResult
   >;
 
   constructor(
@@ -82,6 +97,82 @@ export class AnalysisManager {
         return dc;
       }
     );
+
+    this.groupAnalysisLoader = cache.createLoader(
+      async ([_, groupId], ctx): Promise<GroupAnalysisResult> => {
+        // 1. Load document connectivity
+        const dc = await this.documentConnectivityLoader.load(ctx, [
+          "documentConnectivity",
+        ]);
+
+        // 2. Get incoming types/nominals from upstream groups
+        const incomingTypes = new Map<NodeId, JSONType[]>();
+        const incomingNominals = new Map<NodeId, NominalId[]>();
+
+        const upstreamGroupIds =
+          dc.groupIncomingEdges.get(groupId) ?? new Set();
+        for (const upstreamId of upstreamGroupIds) {
+          const upstream = await this.groupAnalysisLoader.load(ctx, [
+            "groupAnalysis",
+            upstreamId,
+          ]);
+
+          // Collect outgoing types/nominals from upstream
+          for (const [nodeId, type] of upstream.solveResult.getOutgoingTypes()) {
+            if (!incomingTypes.has(nodeId)) incomingTypes.set(nodeId, []);
+            incomingTypes.get(nodeId)!.push(type);
+          }
+          for (const [
+            nodeId,
+            nominal,
+          ] of upstream.solveResult.getOutgoingNominals()) {
+            if (!incomingNominals.has(nodeId))
+              incomingNominals.set(nodeId, []);
+            incomingNominals.get(nodeId)!.push(nominal);
+          }
+        }
+
+        // 3. Get member URIs for this group
+        const memberUris = dc.analysisGroups.get(groupId) ?? new Set([groupId]);
+
+        // 4. Extract nodes/nominals from each document
+        const allNodes = new Map<NodeId, LocalShape>();
+        const allNominals = new Map<NodeId, NominalId>();
+
+        for (const uri of memberUris) {
+          const doc = await this.documentManager.load(ctx, uri);
+          if (doc.type === "openapi") {
+            const parseResult = await this.parseResultLoader.load(ctx, [
+              "specDocument.parse",
+              uri,
+            ]);
+            const { nodes, nominals, outgoingNominals } = extractNodes(uri, doc, parseResult.document);
+
+            for (const [k, v] of nodes) allNodes.set(k, v);
+            for (const [k, v] of nominals) allNominals.set(k, v);
+            // outgoingNominals tells us what type external targets should be
+            // Add these to allNominals so the solver assigns them to external nodes
+            for (const [k, v] of outgoingNominals) allNominals.set(k, v);
+          }
+          // Component files: nodes only, no nominals (they come from incomingNominals)
+          else if (doc.type === "component") {
+            const shapes = doc.yaml.collectLocalShapes(uri);
+            for (const [k, v] of shapes) allNodes.set(k, v);
+          }
+        }
+
+        // 5. Run the Solver
+        const solver = new Solver();
+        const solveResult = solver.solve({
+          nodes: allNodes,
+          nominals: allNominals,
+          incomingTypes,
+          incomingNominals,
+        });
+
+        return { groupId, solveResult };
+      }
+    );
   }
 
   async getParseResult(uri: string): Promise<ParseResult> {
@@ -132,8 +223,8 @@ export class AnalysisManager {
   }
 
   /**
-   * Compute SCCs using Kosaraju's algorithm.
-   * Only multi-file SCCs are stored to save space.
+   * Compute SCCs using Kosaraju's algorithm and collect inter-group edges.
+   * Only multi-file SCCs are stored in analysisGroups to save space.
    */
   private computeAnalysisGroups(dc: DocumentConnectivity): void {
     const graph = dc.graph;
@@ -167,15 +258,19 @@ export class AnalysisManager {
       }
     }
 
-    // Step 3: Second DFS in reverse finish order on transposed graph
+    // Step 3: Second DFS to find SCCs, tracking numeric SCC index per node
     visited.clear();
+    const uriToSccIndex = new Map<string, number>();
+    const sccComponents: Set<string>[] = [];
+    let sccIndex = 0;
 
-    const dfsBuildSccs = (uri: string, component: Set<string>) => {
+    const dfsBuildSccs = (uri: string, component: Set<string>, index: number) => {
       if (visited.has(uri)) return;
       visited.add(uri);
       component.add(uri);
+      uriToSccIndex.set(uri, index);
       for (const neighbor of transposed.get(uri) ?? []) {
-        dfsBuildSccs(neighbor, component);
+        dfsBuildSccs(neighbor, component, index);
       }
     };
 
@@ -183,18 +278,48 @@ export class AnalysisManager {
       const uri = finishOrder.pop()!;
       if (!visited.has(uri)) {
         const component = new Set<string>();
-        dfsBuildSccs(uri, component);
+        dfsBuildSccs(uri, component, sccIndex);
+        sccComponents.push(component);
+        sccIndex++;
+      }
+    }
 
-        // Only include multi-file SCCs to save space
-        if (component.size > 1) {
-          // Group ID is the alphabetically smallest URI
-          const groupId = [...component].sort()[0];
-          dc.analysisGroups.set(groupId, component);
-          for (const member of component) {
-            dc.uriToAnalysisGroupId.set(member, groupId);
-          }
+    // Step 4: Collect inter-SCC edges using numeric indices
+    const sccIncoming: Set<number>[] = sccComponents.map(() => new Set());
+
+    for (const [fromUri, toUris] of graph) {
+      const fromScc = uriToSccIndex.get(fromUri)!;
+      for (const toUri of toUris) {
+        const toScc = uriToSccIndex.get(toUri)!;
+        if (fromScc !== toScc) {
+          sccIncoming[toScc].add(fromScc);
         }
       }
+    }
+
+    // Step 5: Map numeric indices to string group IDs and populate dc
+    const sccIndexToGroupId: string[] = sccComponents.map((component) =>
+      [...component].sort()[0]
+    );
+
+    for (let i = 0; i < sccComponents.length; i++) {
+      const component = sccComponents[i];
+      const groupId = sccIndexToGroupId[i];
+
+      // Only store multi-file SCCs in analysisGroups
+      if (component.size > 1) {
+        dc.analysisGroups.set(groupId, component);
+        for (const member of component) {
+          dc.uriToAnalysisGroupId.set(member, groupId);
+        }
+      }
+
+      // Convert numeric incoming edges to string group IDs
+      const incomingGroups = new Set<string>();
+      for (const incomingScc of sccIncoming[i]) {
+        incomingGroups.add(sccIndexToGroupId[incomingScc]);
+      }
+      dc.groupIncomingEdges.set(groupId, incomingGroups);
     }
   }
 

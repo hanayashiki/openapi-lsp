@@ -6,6 +6,8 @@ export type JsonPointerError =
 
 export type JsonPointerResult = Result<JsonPointer, JsonPointerError>;
 
+export type JsonPointerLoose = (string | number)[];
+
 export type JsonPointer = string[];
 
 /**
@@ -89,4 +91,33 @@ export function parseJsonPointer(pointer: string): JsonPointerResult {
  */
 export function isLocalPointer(ref: string): boolean {
   return ref.startsWith("#");
+}
+
+/**
+ * Encode a JSON Pointer reference token per RFC 6901
+ * ~ → ~0, / → ~1
+ */
+function encodeToken(token: string | number): string {
+  if (typeof token === "number") {
+    return String(token);
+  }
+  return token.replace(/~/g, "~0").replace(/\//g, "~1");
+}
+
+/**
+ * Put a JSON pointer to a URI.
+ * Format: `uri#/path/to/node` (fragment is URL-encoded)
+ */
+export function uriWithJsonPointerLoose(
+  uri: string,
+  path: JsonPointerLoose
+): string {
+  if (path.length === 0) {
+    return uri;
+  }
+  const pointer = "/" + path.map(encodeToken).join("/");
+  const nextUri = new URL(uri);
+  nextUri.hash = pointer;
+
+  return nextUri.toString();
 }
