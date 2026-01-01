@@ -52,21 +52,33 @@ export type Reference = {
 
 export interface Member {}
 
-/**
- * Document URI -> Referenced URIs
- */
 export type DocumentConnectivity = {
+  /**
+   * Document URI -> Referenced URIs
+   */
   graph: Map<string, Set<string>>;
+
+  /**
+   * Groups of mutual-referencing docs that must be analyzed together, i.e. SCCs.
+   *
+   * Group URI -> Group Member URIs
+   *
+   * Group URI is the alphabetically smallest URI of the entire group.
+   *
+   * Group must consist of >= 2 elements. !group.has(key) indicates single file group
+   * (which is most common in well-structured projects)
+   */
+  analysisGroups: Map<string, Set<string>>;
+
+  uriToAnalysisGroupId: Map<string, string>;
 };
 
 export namespace DocumentConnectivity {
   export const createDefault = (): DocumentConnectivity => {
     return {
       graph: new Map(),
+      analysisGroups: new Map(),
+      uriToAnalysisGroupId: new Map(),
     };
   };
 }
-/**
- * A group of mutual-referencing modules that must be analyzed together
- */
-export interface AnalysisGroup {}
