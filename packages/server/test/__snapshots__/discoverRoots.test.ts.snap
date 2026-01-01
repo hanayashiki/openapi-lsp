@@ -1,0 +1,48 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`discoverRoots > should discover ring reference and compute SCCs 1`] = `
+{
+  "analysisGroups": Map {
+    "file:///workspace/schemas/NodeA.yaml" => Set {
+      "file:///workspace/schemas/NodeA.yaml",
+      "file:///workspace/schemas/NodeC.yaml",
+      "file:///workspace/schemas/NodeB.yaml",
+    },
+  },
+  "graph": Map {
+    "file:///workspace/openapi.yaml" => Set {
+      "file:///workspace/schemas/NodeA.yaml",
+    },
+    "file:///workspace/schemas/NodeA.yaml" => Set {
+      "file:///workspace/schemas/NodeB.yaml",
+    },
+    "file:///workspace/schemas/NodeB.yaml" => Set {
+      "file:///workspace/schemas/NodeC.yaml",
+    },
+    "file:///workspace/schemas/NodeC.yaml" => Set {
+      "file:///workspace/schemas/NodeA.yaml",
+    },
+  },
+  "uriToAnalysisGroupId": Map {
+    "file:///workspace/schemas/NodeA.yaml" => "file:///workspace/schemas/NodeA.yaml",
+    "file:///workspace/schemas/NodeC.yaml" => "file:///workspace/schemas/NodeA.yaml",
+    "file:///workspace/schemas/NodeB.yaml" => "file:///workspace/schemas/NodeA.yaml",
+  },
+}
+`;
+
+exports[`discoverRoots > should handle linear references without SCCs 1`] = `
+{
+  "analysisGroups": Map {},
+  "graph": Map {
+    "file:///workspace/openapi.yaml" => Set {
+      "file:///workspace/schemas/A.yaml",
+    },
+    "file:///workspace/schemas/A.yaml" => Set {
+      "file:///workspace/schemas/B.yaml",
+    },
+    "file:///workspace/schemas/B.yaml" => Set {},
+  },
+  "uriToAnalysisGroupId": Map {},
+}
+`;

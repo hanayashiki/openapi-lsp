@@ -3,5 +3,5 @@
   "compilerOptions": {
     "lib": ["ES2024", "DOM"]
   },
-  "include": ["src", "scripts"]
+  "include": ["src", "scripts", "test"]
 }

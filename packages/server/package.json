@@ -7,7 +7,7 @@
   "scripts": {
     "clean": "rm -rf *.tsbuildinfo",
     "check": "tsc",
-    "test": "echo \"No tests yet\""
+    "test": "vitest run"
   },
   "dependencies": {
     "@openapi-lsp/core": "workspace:*",
@@ -20,6 +20,7 @@
   },
   "devDependencies": {
     "@types/js-md5": "^0.8.0",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vitest": "^4.0.16"
   }
 }
