@@ -1,12 +1,12 @@
 import { OpenAPI, OpenAPIInput } from "@openapi-lsp/core/openapi";
 import { SpecDocument } from "./ServerDocument.js";
-import { Analysis } from "./Analysis.js";
+import { ParseResult } from "./Analysis.js";
 import { getDefinitions } from "./getDefinitions.js";
 import { ZodError } from "zod";
 
-export const analyzeSpecDocument = async (
+export const parseSpecDocument = async (
   spec: SpecDocument
-): Promise<Analysis> => {
+): Promise<ParseResult> => {
   try {
     // Try strict parsing first
     const document = OpenAPI.Document.parse(spec.yaml.ast.toJS());

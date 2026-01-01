@@ -4,8 +4,8 @@ import {
   QueryCache,
 } from "@openapi-lsp/core/queries";
 import { ServerDocumentManager } from "./DocumentManager.js";
-import { Analysis } from "./Analysis.js";
-import { analyzeSpecDocument } from "./analyze.js";
+import { ParseResult } from "./Analysis.js";
+import { parseSpecDocument } from "./analyze.js";
 import { Workspace } from "../workspace/Workspace.js";
 import { VFS } from "../vfs/VFS.js";
 import { DocumentConnectivity } from "./Analysis.js";
@@ -15,7 +15,7 @@ import { openapiFilePatterns } from "@openapi-lsp/core/constants";
 import { DocumentReferenceManager } from "./DocumentReferenceManager.js";
 
 export class AnalysisManager {
-  loader: CacheLoader<["specDocument.analyze", string], Analysis>;
+  loader: CacheLoader<["specDocument.parse", string], ParseResult>;
   documentConnectivityLoader: CacheLoader<
     ["documentConnectivity"],
     DocumentConnectivity
@@ -29,14 +29,14 @@ export class AnalysisManager {
     cache: QueryCache
   ) {
     this.loader = cache.createLoader(
-      async ([_, uri], ctx): Promise<Analysis> => {
+      async ([_, uri], ctx): Promise<ParseResult> => {
         const spec = await this.documentManager.load(ctx, uri);
 
         if (spec.type !== "openapi") {
           throw new Error(`Cannot analyze non-openapi document: ${spec.type}`);
         }
 
-        return analyzeSpecDocument(spec);
+        return parseSpecDocument(spec);
       }
     );
 
@@ -85,14 +85,19 @@ export class AnalysisManager {
     );
   }
 
-  getAnalysis = async (uri: string): Promise<Analysis> => {
-    return await this.loader.use(["specDocument.analyze", uri]);
-  };
+  async getParseResult(uri: string): Promise<ParseResult> {
+    return await this.loader.use(["specDocument.parse", uri]);
+  }
 
-  load = (ctx: CacheComputeContext, uri: string): Promise<Analysis> => {
-    return this.loader.load(ctx, ["specDocument.analyze", uri]);
-  };
+  async load(ctx: CacheComputeContext, uri: string): Promise<ParseResult> {
+    return await this.loader.load(ctx, ["specDocument.parse", uri]);
+  }
 
+  async discoverRoots(): Promise<DocumentConnectivity> {
+    return await this.documentConnectivityLoader.use(["documentConnectivity"]);
+  }
+
+  // ----- analytic algoritms -----
   private async dfsConnectivity(
     ctx: CacheComputeContext,
     dc: DocumentConnectivity,
@@ -125,65 +130,6 @@ export class AnalysisManager {
         }
       }
     }
-  }
-
-  static toGraphviz(dc: DocumentConnectivity): string {
-    // Collect all URIs to find the longest common prefix
-    const allUris: string[] = [];
-    for (const [uri, neighbors] of dc.graph) {
-      allUris.push(uri);
-      for (const neighbor of neighbors) {
-        allUris.push(neighbor);
-      }
-    }
-
-    // Find longest common prefix
-    const longestCommonPrefix = (strs: string[]): string => {
-      if (strs.length === 0) return "";
-      let prefix = strs[0];
-      for (let i = 1; i < strs.length; i++) {
-        while (!strs[i].startsWith(prefix)) {
-          prefix = prefix.slice(0, -1);
-          if (prefix === "") return "";
-        }
-      }
-      return prefix;
-    };
-
-    const prefix = longestCommonPrefix(allUris);
-    const trimUri = (uri: string) => uri.slice(prefix.length);
-
-    const lines: string[] = ["digraph DocumentConnectivity {"];
-    lines.push("  compound=true;");
-
-    // Draw SCCs as subgraph clusters (renders as boxes around grouped nodes)
-    let clusterIndex = 0;
-    for (const [_, members] of dc.analysisGroups) {
-      lines.push(`  subgraph cluster_${clusterIndex++} {`);
-      lines.push(`    style=rounded;`);
-      lines.push(`    label="SCC";`);
-      for (const member of members) {
-        const name = JSON.stringify(trimUri(member));
-        lines.push(`    ${name} [label=${name}];`);
-      }
-      lines.push(`  }`);
-    }
-
-    // Draw all edges
-    for (const [uri, neighbors] of dc.graph) {
-      const from = JSON.stringify(trimUri(uri));
-      for (const neighbor of neighbors) {
-        const to = JSON.stringify(trimUri(neighbor));
-        lines.push(`  ${from} -> ${to};`);
-      }
-    }
-
-    lines.push("}");
-    return lines.join("\n");
-  }
-
-  static logGraphviz(dc: DocumentConnectivity): void {
-    console.debug(AnalysisManager.toGraphviz(dc));
   }
 
   /**
@@ -253,13 +199,6 @@ export class AnalysisManager {
     }
   }
 
-  static logAnalysisGroups(dc: DocumentConnectivity): void {
-    console.debug("Analysis Groups (SCCs):");
-    for (const [groupId, members] of dc.analysisGroups) {
-      console.debug(`  ${groupId}: [${[...members].join(", ")}]`);
-    }
-  }
-
   static getConnectivityHash(dc: DocumentConnectivity): string {
     const hash = md5.create();
     const orderedKeys = dc.graph.keys();
@@ -278,7 +217,70 @@ export class AnalysisManager {
     return hash.base64();
   }
 
-  async discoverRoots(): Promise<DocumentConnectivity> {
-    return await this.documentConnectivityLoader.use(["documentConnectivity"]);
+  // ----- Debug Helpers -----
+  static logAnalysisGroups(dc: DocumentConnectivity): void {
+    console.debug("Analysis Groups (SCCs):");
+    for (const [groupId, members] of dc.analysisGroups) {
+      console.debug(`  ${groupId}: [${[...members].join(", ")}]`);
+    }
+  }
+
+  static toGraphviz(dc: DocumentConnectivity): string {
+    // Collect all URIs to find the longest common prefix
+    const allUris: string[] = [];
+    for (const [uri, neighbors] of dc.graph) {
+      allUris.push(uri);
+      for (const neighbor of neighbors) {
+        allUris.push(neighbor);
+      }
+    }
+
+    // Find longest common prefix
+    const longestCommonPrefix = (strs: string[]): string => {
+      if (strs.length === 0) return "";
+      let prefix = strs[0];
+      for (let i = 1; i < strs.length; i++) {
+        while (!strs[i].startsWith(prefix)) {
+          prefix = prefix.slice(0, -1);
+          if (prefix === "") return "";
+        }
+      }
+      return prefix;
+    };
+
+    const prefix = longestCommonPrefix(allUris);
+    const trimUri = (uri: string) => uri.slice(prefix.length);
+
+    const lines: string[] = ["digraph DocumentConnectivity {"];
+    lines.push("  compound=true;");
+
+    // Draw SCCs as subgraph clusters (renders as boxes around grouped nodes)
+    let clusterIndex = 0;
+    for (const [_, members] of dc.analysisGroups) {
+      lines.push(`  subgraph cluster_${clusterIndex++} {`);
+      lines.push(`    style=rounded;`);
+      lines.push(`    label="SCC";`);
+      for (const member of members) {
+        const name = JSON.stringify(trimUri(member));
+        lines.push(`    ${name} [label=${name}];`);
+      }
+      lines.push(`  }`);
+    }
+
+    // Draw all edges
+    for (const [uri, neighbors] of dc.graph) {
+      const from = JSON.stringify(trimUri(uri));
+      for (const neighbor of neighbors) {
+        const to = JSON.stringify(trimUri(neighbor));
+        lines.push(`  ${from} -> ${to};`);
+      }
+    }
+
+    lines.push("}");
+    return lines.join("\n");
+  }
+
+  static logGraphviz(dc: DocumentConnectivity): void {
+    console.debug(AnalysisManager.toGraphviz(dc));
   }
 }

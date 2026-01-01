@@ -1,22 +1,22 @@
 import { OpenAPI } from "@openapi-lsp/core/openapi";
 import { parseJsonPointer } from "@openapi-lsp/core/json-pointer";
-import { Analysis, Definition } from "./Analysis.js";
+import { ParseResult, Definition } from "./Analysis.js";
 
 /**
- * Resolve a $ref to its Definition by looking up in analysis.definitions
+ * Resolve a $ref to its Definition by looking up in parseResult.definitions
  * Returns null if ref cannot be resolved
  */
 export function resolveRef(
   ref: OpenAPI.Reference,
-  analysis: Analysis
+  parseResult: ParseResult
 ): Definition | null {
-  const parseResult = parseJsonPointer(ref.$ref);
-  if (!parseResult.success) return null;
+  const pointerParseResult = parseJsonPointer(ref.$ref);
+  if (!pointerParseResult.success) return null;
 
-  const path = parseResult.data;
+  const path = pointerParseResult.data;
 
   return (
-    analysis.definitions.find(
+    parseResult.definitions.find(
       (d) =>
         d.path.length === path.length && d.path.every((p, i) => p === path[i])
     ) ?? null

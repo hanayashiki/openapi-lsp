@@ -100,7 +100,7 @@ export class OpenAPILanguageServer {
 
     if (spec.type !== "openapi") return null;
 
-    const analysis = await this.analysisManager.getAnalysis(
+    const parseResult = await this.analysisManager.getParseResult(
       params.textDocument.uri
     );
 
@@ -108,12 +108,12 @@ export class OpenAPILanguageServer {
     let definition = null;
     const refStr = spec.yaml.getRefAtPosition(params.position);
     if (refStr) {
-      definition = resolveRef({ $ref: refStr }, analysis);
+      definition = resolveRef({ $ref: refStr }, parseResult);
     }
 
     // If not on a $ref, check if on a component key
     if (!definition) {
-      definition = getDefinitionKeyByPosition(analysis, params.position);
+      definition = getDefinitionKeyByPosition(parseResult, params.position);
     }
 
     if (!definition) {

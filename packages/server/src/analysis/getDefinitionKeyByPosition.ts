@@ -1,12 +1,12 @@
 import { Position } from "vscode-languageserver-textdocument";
-import { Analysis, Definition } from "./Analysis.js";
+import { ParseResult, Definition } from "./Analysis.js";
 import { isPositionInRange } from "./utils.js";
 
 export function getDefinitionKeyByPosition(
-  analysis: Analysis,
+  parseResult: ParseResult,
   position: Position
 ): Definition | null {
-  for (const def of analysis.definitions) {
+  for (const def of parseResult.definitions) {
     if (isPositionInRange(position, def.nameRange)) {
       return def;
     }

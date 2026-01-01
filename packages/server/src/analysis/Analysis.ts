@@ -4,7 +4,7 @@ import { SpecDocumentPath } from "./ServerDocument.js";
 import { ZodError } from "zod";
 import { ModuleResolutionResult } from "./ModuleResolution.js";
 
-export interface Analysis {
+export interface ParseResult {
   document: OpenAPI.Document;
   zodError: ZodError | null;
   definitions: Definition[];
