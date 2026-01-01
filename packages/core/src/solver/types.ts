@@ -76,9 +76,41 @@ export type Reason =
   | { kind: "shape"; node: NodeId };
 
 /**
- * Result of the solve() operation.
+ * Input to the solver - contains all nodes and nominal anchors.
  */
-export type SolveResult = {
-  ok: boolean;
-  diagnostics: Diagnostic[];
+export type SolverInput = {
+  /** All nodes with their local shapes */
+  nodes: Map<NodeId, LocalShape>;
+  /** Nominal anchors mapping nodes to nominal identifiers */
+  nominals: Map<NodeId, NominalId>;
 };
+
+/**
+ * Result of the solve() operation with query methods.
+ */
+export interface SolveResult {
+  /** Whether solving completed without errors */
+  readonly ok: boolean;
+
+  /** All diagnostics produced during solving */
+  readonly diagnostics: readonly Diagnostic[];
+
+  /**
+   * Get the resolved type for a node.
+   * @throws Error if the node was not in the input
+   */
+  getType(node: NodeId): JSONType;
+
+  /**
+   * Get the equivalence class ID for a node.
+   * @throws Error if the node was not in the input
+   */
+  getClassId(node: NodeId): ClassId;
+
+  /**
+   * Get the canonical nominal for a node's equivalence class.
+   * Returns null if the class has no nominal anchor.
+   * @throws Error if the node was not in the input
+   */
+  getCanonicalNominal(node: NodeId): NominalId | null;
+}

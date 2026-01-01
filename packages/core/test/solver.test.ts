@@ -1,36 +1,42 @@
 import { describe, it, expect } from "vitest";
 import { Solver } from "../src/solver/index.js";
+import type { LocalShape } from "../src/solver/index.js";
 
 describe("Solver", () => {
   it("resolves basic prim and object types", () => {
     const solver = new Solver();
 
-    solver.addNode("file#/name", { kind: "prim", value: "hello" });
-    solver.addNode("file#/count", { kind: "prim", value: 42 });
-
-    // Object with field nodes registered separately
-    solver.addNode("file#/obj/foo", { kind: "prim", value: "bar" });
-    solver.addNode("file#/obj/num", { kind: "prim", value: 123 });
-    solver.addNode("file#/obj", {
-      kind: "object",
-      fields: {
-        foo: "file#/obj/foo",
-        num: "file#/obj/num",
-      },
+    const result = solver.solve({
+      nodes: new Map<string, LocalShape>([
+        ["file#/name", { kind: "prim", value: "hello" }],
+        ["file#/count", { kind: "prim", value: 42 }],
+        ["file#/obj/foo", { kind: "prim", value: "bar" }],
+        ["file#/obj/num", { kind: "prim", value: 123 }],
+        [
+          "file#/obj",
+          {
+            kind: "object",
+            fields: {
+              foo: "file#/obj/foo",
+              num: "file#/obj/num",
+            },
+          },
+        ],
+      ]),
+      nominals: new Map(),
     });
 
-    const result = solver.solve();
     expect(result.ok).toBe(true);
 
-    expect(solver.getType("file#/name")).toEqual({
+    expect(result.getType("file#/name")).toEqual({
       kind: "prim",
       prim: "string",
     });
-    expect(solver.getType("file#/count")).toEqual({
+    expect(result.getType("file#/count")).toEqual({
       kind: "prim",
       prim: "number",
     });
-    expect(solver.getType("file#/obj")).toEqual({
+    expect(result.getType("file#/obj")).toEqual({
       kind: "object",
       fields: {
         foo: { kind: "prim", prim: "string" },
@@ -42,18 +48,18 @@ describe("Solver", () => {
   it("resolves $ref to same equivalence class", () => {
     const solver = new Solver();
 
-    // Register field node first
-    solver.addNode("file#/a/x", { kind: "prim", value: 1 });
-    solver.addNode("file#/a", {
-      kind: "object",
-      fields: { x: "file#/a/x" },
+    const result = solver.solve({
+      nodes: new Map<string, LocalShape>([
+        ["file#/a/x", { kind: "prim", value: 1 }],
+        ["file#/a", { kind: "object", fields: { x: "file#/a/x" } }],
+        ["file#/b", { kind: "ref", target: "file#/a" }],
+      ]),
+      nominals: new Map(),
     });
-    solver.addNode("file#/b", { kind: "ref", target: "file#/a" });
 
-    const result = solver.solve();
     expect(result.ok).toBe(true);
-    expect(solver.getClassId("file#/a")).toBe(solver.getClassId("file#/b"));
-    expect(solver.getType("file#/b")).toEqual({
+    expect(result.getClassId("file#/a")).toBe(result.getClassId("file#/b"));
+    expect(result.getType("file#/b")).toEqual({
       kind: "object",
       fields: { x: { kind: "prim", prim: "number" } },
     });
@@ -62,23 +68,27 @@ describe("Solver", () => {
   it("resolves $ref chain correctly", () => {
     const solver = new Solver();
 
-    solver.addNode("file#/target", { kind: "prim", value: "hello" });
-    solver.addNode("file#/ref1", { kind: "ref", target: "file#/target" });
-    solver.addNode("file#/ref2", { kind: "ref", target: "file#/ref1" });
+    const result = solver.solve({
+      nodes: new Map<string, LocalShape>([
+        ["file#/target", { kind: "prim", value: "hello" }],
+        ["file#/ref1", { kind: "ref", target: "file#/target" }],
+        ["file#/ref2", { kind: "ref", target: "file#/ref1" }],
+      ]),
+      nominals: new Map(),
+    });
 
-    const result = solver.solve();
     expect(result.ok).toBe(true);
 
     // All three should be in same equivalence class
-    expect(solver.getClassId("file#/target")).toBe(
-      solver.getClassId("file#/ref1")
+    expect(result.getClassId("file#/target")).toBe(
+      result.getClassId("file#/ref1")
     );
-    expect(solver.getClassId("file#/ref1")).toBe(
-      solver.getClassId("file#/ref2")
+    expect(result.getClassId("file#/ref1")).toBe(
+      result.getClassId("file#/ref2")
     );
 
     // All should have the same type
-    expect(solver.getType("file#/ref2")).toEqual({
+    expect(result.getType("file#/ref2")).toEqual({
       kind: "prim",
       prim: "string",
     });
@@ -87,9 +97,13 @@ describe("Solver", () => {
   it("reports MISSING_TARGET for ref to non-existent node", () => {
     const solver = new Solver();
 
-    solver.addNode("file#/a", { kind: "ref", target: "file#/missing" });
+    const result = solver.solve({
+      nodes: new Map<string, LocalShape>([
+        ["file#/a", { kind: "ref", target: "file#/missing" }],
+      ]),
+      nominals: new Map(),
+    });
 
-    const result = solver.solve();
     expect(result.ok).toBe(false);
     expect(result.diagnostics).toContainEqual({
       code: "MISSING_TARGET",
@@ -120,61 +134,70 @@ describe("Solver", () => {
   ])("ring ref: $name", ({ nodes, expectedType }) => {
     const solver = new Solver();
 
-    for (const { id, shape } of nodes) {
-      solver.addNode(id, shape);
-    }
+    const result = solver.solve({
+      nodes: new Map(nodes.map(({ id, shape }) => [id, shape])),
+      nominals: new Map(),
+    });
 
-    const result = solver.solve();
     expect(result.ok).toBe(true);
 
     // All nodes in the cycle should be in same equivalence class
-    const classIds = nodes.map((n) => solver.getClassId(n.id));
+    const classIds = nodes.map((n) => result.getClassId(n.id));
     expect(new Set(classIds).size).toBe(1);
 
     // All should have the expected type
     for (const { id } of nodes) {
-      expect(solver.getType(id)).toEqual(expectedType);
+      expect(result.getType(id)).toEqual(expectedType);
     }
   });
 
   it("assigns nominal anchor to equivalence class", () => {
     const solver = new Solver();
 
-    solver.addNode("file#/components/schemas/Pet", {
-      kind: "object",
-      fields: { name: "file#/components/schemas/Pet/name" },
+    const result = solver.solve({
+      nodes: new Map<string, LocalShape>([
+        [
+          "file#/components/schemas/Pet",
+          {
+            kind: "object",
+            fields: { name: "file#/components/schemas/Pet/name" },
+          },
+        ],
+        [
+          "file#/components/schemas/Pet/name",
+          { kind: "prim", value: "Fluffy" },
+        ],
+        [
+          "file#/paths/pet",
+          { kind: "ref", target: "file#/components/schemas/Pet" },
+        ],
+      ]),
+      nominals: new Map([["file#/components/schemas/Pet", "Pet"]]),
     });
-    solver.addNode("file#/components/schemas/Pet/name", {
-      kind: "prim",
-      value: "Fluffy",
-    });
-    solver.setNominalAnchor("file#/components/schemas/Pet", "Pet");
 
-    solver.addNode("file#/paths/pet", {
-      kind: "ref",
-      target: "file#/components/schemas/Pet",
-    });
-
-    const result = solver.solve();
     expect(result.ok).toBe(true);
 
     // Both nodes should have the same nominal
-    expect(solver.getCanonicalNominal("file#/components/schemas/Pet")).toBe(
+    expect(result.getCanonicalNominal("file#/components/schemas/Pet")).toBe(
       "Pet"
     );
-    expect(solver.getCanonicalNominal("file#/paths/pet")).toBe("Pet");
+    expect(result.getCanonicalNominal("file#/paths/pet")).toBe("Pet");
   });
 
   it("reports NOMINAL_CONFLICT when two nominals in same equivalence class", () => {
     const solver = new Solver();
 
-    solver.addNode("file#/a", { kind: "prim", value: "hello" });
-    solver.addNode("file#/b", { kind: "ref", target: "file#/a" });
+    const result = solver.solve({
+      nodes: new Map<string, LocalShape>([
+        ["file#/a", { kind: "prim", value: "hello" }],
+        ["file#/b", { kind: "ref", target: "file#/a" }],
+      ]),
+      nominals: new Map([
+        ["file#/a", "TypeA"],
+        ["file#/b", "TypeB"],
+      ]),
+    });
 
-    solver.setNominalAnchor("file#/a", "TypeA");
-    solver.setNominalAnchor("file#/b", "TypeB");
-
-    const result = solver.solve();
     expect(result.ok).toBe(false);
     expect(result.diagnostics).toContainEqual(
       expect.objectContaining({
@@ -182,6 +205,26 @@ describe("Solver", () => {
         a: "TypeA",
         b: "TypeB",
       })
+    );
+  });
+
+  it("throws error when querying node not in input", () => {
+    const solver = new Solver();
+    const result = solver.solve({
+      nodes: new Map<string, LocalShape>([
+        ["file#/a", { kind: "prim", value: "hello" }],
+      ]),
+      nominals: new Map(),
+    });
+
+    expect(() => result.getType("file#/missing")).toThrow(
+      'Node "file#/missing" was not in the solver input'
+    );
+    expect(() => result.getClassId("file#/missing")).toThrow(
+      'Node "file#/missing" was not in the solver input'
+    );
+    expect(() => result.getCanonicalNominal("file#/missing")).toThrow(
+      'Node "file#/missing" was not in the solver input'
     );
   });
 });

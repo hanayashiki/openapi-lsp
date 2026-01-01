@@ -15,7 +15,7 @@ import { openapiFilePatterns } from "@openapi-lsp/core/constants";
 import { DocumentReferenceManager } from "./DocumentReferenceManager.js";
 
 export class AnalysisManager {
-  loader: CacheLoader<["specDocument.parse", string], ParseResult>;
+  parseResultLoader: CacheLoader<["specDocument.parse", string], ParseResult>;
   documentConnectivityLoader: CacheLoader<
     ["documentConnectivity"],
     DocumentConnectivity
@@ -28,7 +28,7 @@ export class AnalysisManager {
     private vfs: VFS,
     cache: QueryCache
   ) {
-    this.loader = cache.createLoader(
+    this.parseResultLoader = cache.createLoader(
       async ([_, uri], ctx): Promise<ParseResult> => {
         const spec = await this.documentManager.load(ctx, uri);
 
@@ -86,11 +86,11 @@ export class AnalysisManager {
   }
 
   async getParseResult(uri: string): Promise<ParseResult> {
-    return await this.loader.use(["specDocument.parse", uri]);
+    return await this.parseResultLoader.use(["specDocument.parse", uri]);
   }
 
   async load(ctx: CacheComputeContext, uri: string): Promise<ParseResult> {
-    return await this.loader.load(ctx, ["specDocument.parse", uri]);
+    return await this.parseResultLoader.load(ctx, ["specDocument.parse", uri]);
   }
 
   async discoverRoots(): Promise<DocumentConnectivity> {
