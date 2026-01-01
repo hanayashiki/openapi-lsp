@@ -18,24 +18,22 @@ import type {
 class SolveContext {
   readonly nodes: Map<NodeId, LocalShape>;
   readonly nominals: Map<NodeId, NominalId>;
+  readonly incomingTypes: Map<NodeId, JSONType[]>;
+  readonly incomingNominals: Map<NodeId, NominalId[]>;
 
   nodeToClass: Map<NodeId, ClassId> = new Map();
   classes: Map<ClassId, Class> = new Map();
   classTypes: Map<ClassId, JSONType> = new Map();
   diagnostics: Diagnostic[] = [];
 
+  /** Nodes that are ref targets but not in input.nodes (external dependencies) */
+  externalNodes: Set<NodeId> = new Set();
+
   constructor(input: SolverInput) {
     this.nodes = input.nodes;
     this.nominals = input.nominals;
-  }
-
-  /** Helper: get node type during computation (returns typevar if not yet computed) */
-  getNodeType(nodeId: NodeId): JSONType {
-    const classId = this.nodeToClass.get(nodeId);
-    if (classId === undefined) {
-      return { kind: "typevar" };
-    }
-    return this.classTypes.get(classId) ?? { kind: "typevar" };
+    this.incomingTypes = input.incomingTypes ?? new Map();
+    this.incomingNominals = input.incomingNominals ?? new Map();
   }
 }
 
@@ -51,13 +49,16 @@ class SolveResultImpl implements SolveResult {
   private readonly classes: Map<ClassId, Class>;
   private readonly classTypes: Map<ClassId, JSONType>;
   private readonly inputNodeIds: Set<NodeId>;
+  private readonly outgoingTypesMap: Map<NodeId, JSONType>;
+  private readonly outgoingNominalsMap: Map<NodeId, NominalId>;
 
   constructor(
     diagnostics: Diagnostic[],
     nodeToClass: Map<NodeId, ClassId>,
     classes: Map<ClassId, Class>,
     classTypes: Map<ClassId, JSONType>,
-    inputNodeIds: Set<NodeId>
+    inputNodeIds: Set<NodeId>,
+    externalNodes: Set<NodeId>
   ) {
     this.ok = diagnostics.length === 0;
     this.diagnostics = Object.freeze([...diagnostics]);
@@ -65,13 +66,28 @@ class SolveResultImpl implements SolveResult {
     this.classes = classes;
     this.classTypes = classTypes;
     this.inputNodeIds = inputNodeIds;
+
+    // Compute outgoing types and nominals from external nodes
+    this.outgoingTypesMap = new Map();
+    this.outgoingNominalsMap = new Map();
+    for (const extNode of externalNodes) {
+      const classId = nodeToClass.get(extNode);
+      if (classId !== undefined) {
+        const type = classTypes.get(classId) ?? { kind: "typevar" };
+        this.outgoingTypesMap.set(extNode, type);
+
+        const cls = classes.get(classId);
+        if (cls?.nominal) {
+          this.outgoingNominalsMap.set(extNode, cls.nominal);
+        }
+      }
+    }
   }
 
   getType(node: NodeId): JSONType {
     this.assertNodeExists(node);
     const classId = this.nodeToClass.get(node);
     if (classId === undefined) {
-      // Node exists in input but not in any class (shouldn't happen normally)
       return { kind: "typevar" };
     }
     return this.classTypes.get(classId) ?? { kind: "typevar" };
@@ -91,6 +107,14 @@ class SolveResultImpl implements SolveResult {
     const classId = this.nodeToClass.get(node);
     if (classId === undefined) return null;
     return this.classes.get(classId)?.nominal ?? null;
+  }
+
+  getOutgoingTypes(): Map<NodeId, JSONType> {
+    return new Map(this.outgoingTypesMap);
+  }
+
+  getOutgoingNominals(): Map<NodeId, NominalId> {
+    return new Map(this.outgoingNominalsMap);
   }
 
   private assertNodeExists(node: NodeId): void {
@@ -121,6 +145,7 @@ export class Solver {
     const ctx = new SolveContext(input);
 
     this.buildEquivalenceClasses(ctx);
+    this.processIncomingNominals(ctx);
     this.computeTypes(ctx);
 
     return new SolveResultImpl(
@@ -128,7 +153,8 @@ export class Solver {
       ctx.nodeToClass,
       ctx.classes,
       ctx.classTypes,
-      new Set(input.nodes.keys())
+      new Set(input.nodes.keys()),
+      ctx.externalNodes
     );
   }
 
@@ -148,14 +174,12 @@ export class Solver {
       if (shape.kind === "ref") {
         const target = shape.target;
         if (!ctx.nodes.has(target)) {
-          ctx.diagnostics.push({
-            code: "MISSING_TARGET",
-            from: nodeId,
-            to: target,
-          });
-        } else {
-          uf.union(nodeId, target);
+          // External ref - track it and add to Union-Find
+          ctx.externalNodes.add(target);
+          uf.makeSet(target);
         }
+        // Always union (whether target is local or external)
+        uf.union(nodeId, target);
       }
     }
 
@@ -171,11 +195,14 @@ export class Solver {
         nominal: null,
       };
 
-      // Check for nominal conflicts and assign nominal
+      // Check for nominal conflicts and assign nominal from local nodes
       let firstNominal: { node: NodeId; nominal: NominalId } | null = null;
 
       for (const node of nodeSet) {
         ctx.nodeToClass.set(node, classId);
+
+        // Skip external nodes for nominal checking
+        if (ctx.externalNodes.has(node)) continue;
 
         const nominal = ctx.nominals.get(node);
         if (nominal) {
@@ -183,13 +210,16 @@ export class Solver {
             firstNominal = { node, nominal };
             cls.nominal = nominal;
           } else if (firstNominal.nominal !== nominal) {
-            // Nominal conflict
             ctx.diagnostics.push({
               code: "NOMINAL_CONFLICT",
               a: firstNominal.nominal,
               b: nominal,
               proofA: [
-                { kind: "anchor", node: firstNominal.node, nominal: firstNominal.nominal },
+                {
+                  kind: "anchor",
+                  node: firstNominal.node,
+                  nominal: firstNominal.nominal,
+                },
               ],
               proofB: [{ kind: "anchor", node, nominal }],
             });
@@ -198,6 +228,33 @@ export class Solver {
       }
 
       ctx.classes.set(classId, cls);
+    }
+  }
+
+  /**
+   * Process incoming nominals - check for conflicts and assign to classes.
+   */
+  private processIncomingNominals(ctx: SolveContext): void {
+    for (const [nodeId, nominals] of ctx.incomingNominals) {
+      const classId = ctx.nodeToClass.get(nodeId);
+      if (classId === undefined) continue;
+
+      const cls = ctx.classes.get(classId);
+      if (!cls) continue;
+
+      for (const nominal of nominals) {
+        if (cls.nominal === null) {
+          cls.nominal = nominal;
+        } else if (cls.nominal !== nominal) {
+          ctx.diagnostics.push({
+            code: "NOMINAL_CONFLICT",
+            a: cls.nominal,
+            b: nominal,
+            proofA: [{ kind: "anchor", node: nodeId, nominal: cls.nominal }],
+            proofB: [{ kind: "anchor", node: nodeId, nominal }],
+          });
+        }
+      }
     }
   }
 
@@ -215,21 +272,17 @@ export class Solver {
 
       for (const classId of pendingClasses) {
         const cls = ctx.classes.get(classId)!;
-        const type = this.unifyClass(ctx, cls);
 
-        if (type !== null && type.kind !== "typevar") {
-          // Successfully computed a concrete type
+        // Check if all dependencies are resolved first
+        if (!this.allDependenciesResolved(ctx, cls)) {
+          continue;
+        }
+
+        const type = this.unifyClass(ctx, cls);
+        if (type !== null) {
           ctx.classTypes.set(classId, type);
           pendingClasses.delete(classId);
           madeProgress = true;
-        } else if (type !== null) {
-          // Got typevar, might resolve later or stay as typevar
-          // Check if all dependencies are resolved
-          if (this.allDependenciesResolved(ctx, cls)) {
-            ctx.classTypes.set(classId, type);
-            pendingClasses.delete(classId);
-            madeProgress = true;
-          }
         }
       }
     }
@@ -246,39 +299,51 @@ export class Solver {
    * Unify all concrete (non-ref) shapes in an equivalence class.
    */
   private unifyClass(ctx: SolveContext, cls: Class): JSONType | null {
-    const concreteShapes: { node: NodeId; shape: LocalShape }[] = [];
+    // Collect all incoming types for nodes in this class
+    const incomingTypesForClass = [...cls.nodes].flatMap((node) =>
+      (ctx.incomingTypes.get(node) ?? []).map((type) => ({ node, type }))
+    );
 
-    for (const node of cls.nodes) {
-      const shape = ctx.nodes.get(node);
-      if (shape && shape.kind !== "ref") {
-        concreteShapes.push({ node, shape });
-      }
-    }
+    // Collect all concrete shapes from local nodes
+    const concreteShapes = [...cls.nodes]
+      .filter((node) => !ctx.externalNodes.has(node))
+      .map((node) => ({ node, shape: ctx.nodes.get(node) }))
+      .filter(
+        (entry): entry is { node: NodeId; shape: LocalShape } =>
+          entry.shape !== undefined && entry.shape.kind !== "ref"
+      );
 
-    if (concreteShapes.length === 0) {
-      // No concrete shapes - type is unknown
-      return { kind: "typevar" };
-    }
+    // Start with typevar
+    let unifiedType: JSONType = { kind: "typevar" };
 
-    // Convert first shape to type
-    let unifiedType = this.shapeToType(ctx, concreteShapes[0].shape);
-
-    // Unify with remaining shapes
-    for (let i = 1; i < concreteShapes.length; i++) {
-      const { node, shape } = concreteShapes[i];
-      const otherType = this.shapeToType(ctx, shape);
-      const result = this.unifyTypes(unifiedType, otherType);
-
+    // Unify all incoming types
+    for (const { node, type } of incomingTypesForClass) {
+      const result = this.unifyTypes(unifiedType, type);
       if (result === null) {
         ctx.diagnostics.push({
           code: "STRUCT_CONFLICT",
           node,
           left: unifiedType,
-          right: otherType,
+          right: type,
         });
         return null;
       }
+      unifiedType = result;
+    }
 
+    // Unify with concrete shapes
+    for (const { node, shape } of concreteShapes) {
+      const shapeType = this.shapeToType(ctx, shape);
+      const result = this.unifyTypes(unifiedType, shapeType);
+      if (result === null) {
+        ctx.diagnostics.push({
+          code: "STRUCT_CONFLICT",
+          node,
+          left: unifiedType,
+          right: shapeType,
+        });
+        return null;
+      }
       unifiedType = result;
     }
 
@@ -294,46 +359,49 @@ export class Solver {
       case "prim":
         return { kind: "prim", prim: this.inferPrimType(shape.value) };
       case "array": {
-        // Look up element node's type
-        const elemType = ctx.getNodeType(shape.elem);
+        const elemType = this.getNodeType(ctx, shape.elem);
         return { kind: "array", elem: elemType };
       }
       case "object": {
         const fields: Record<string, JSONType> = {};
         for (const [key, fieldNodeId] of Object.entries(shape.fields)) {
-          fields[key] = ctx.getNodeType(fieldNodeId);
+          fields[key] = this.getNodeType(ctx, fieldNodeId);
         }
         return { kind: "object", fields };
       }
       case "ref":
-        // Should not reach here in normal flow (refs are handled via union)
         return { kind: "typevar" };
     }
+  }
+
+  /**
+   * Get the type for a node during computation.
+   */
+  private getNodeType(ctx: SolveContext, nodeId: NodeId): JSONType {
+    const classId = ctx.nodeToClass.get(nodeId);
+    if (classId === undefined) {
+      return { kind: "typevar" };
+    }
+    return ctx.classTypes.get(classId) ?? { kind: "typevar" };
   }
 
   /**
    * Check if all child node dependencies of a class have resolved types.
    */
   private allDependenciesResolved(ctx: SolveContext, cls: Class): boolean {
-    for (const nodeId of cls.nodes) {
-      const shape = ctx.nodes.get(nodeId);
-      if (!shape) continue;
+    const dependencyNodeIds = [...cls.nodes]
+      .map((nodeId) => ctx.nodes.get(nodeId))
+      .filter((shape): shape is LocalShape => shape !== undefined)
+      .flatMap((shape) => {
+        if (shape.kind === "object") return Object.values(shape.fields);
+        if (shape.kind === "array") return [shape.elem];
+        return [];
+      });
 
-      if (shape.kind === "object") {
-        for (const fieldNodeId of Object.values(shape.fields)) {
-          const fieldClassId = ctx.nodeToClass.get(fieldNodeId);
-          if (fieldClassId !== undefined && !ctx.classTypes.has(fieldClassId)) {
-            return false;
-          }
-        }
-      } else if (shape.kind === "array") {
-        const elemClassId = ctx.nodeToClass.get(shape.elem);
-        if (elemClassId !== undefined && !ctx.classTypes.has(elemClassId)) {
-          return false;
-        }
-      }
-    }
-    return true;
+    return dependencyNodeIds.every((nodeId) => {
+      const classId = ctx.nodeToClass.get(nodeId);
+      return classId === undefined || ctx.classTypes.has(classId);
+    });
   }
 
   /**

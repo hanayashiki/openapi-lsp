@@ -60,11 +60,6 @@ export type Diagnostic =
       node: NodeId;
       left: JSONType;
       right: JSONType;
-    }
-  | {
-      code: "MISSING_TARGET";
-      from: NodeId;
-      to: NodeId;
     };
 
 /**
@@ -83,6 +78,16 @@ export type SolverInput = {
   nodes: Map<NodeId, LocalShape>;
   /** Nominal anchors mapping nodes to nominal identifiers */
   nominals: Map<NodeId, NominalId>;
+  /**
+   * Pre-resolved types from referencing SCCs.
+   * Multiple types for the same node will be unified; conflicts emit STRUCT_CONFLICT.
+   */
+  incomingTypes?: Map<NodeId, JSONType[]>;
+  /**
+   * Pre-resolved nominals from referencing SCCs.
+   * Multiple nominals for the same node will cause NOMINAL_CONFLICT if they differ.
+   */
+  incomingNominals?: Map<NodeId, NominalId[]>;
 };
 
 /**
@@ -113,4 +118,16 @@ export interface SolveResult {
    * @throws Error if the node was not in the input
    */
   getCanonicalNominal(node: NodeId): NominalId | null;
+
+  /**
+   * Get types for external refs (nodes referenced but not in input).
+   * These are the types this SCC expects from referenced SCCs.
+   */
+  getOutgoingTypes(): Map<NodeId, JSONType>;
+
+  /**
+   * Get nominals for external refs (nodes referenced but not in input).
+   * These are the nominals this SCC expects from referenced SCCs.
+   */
+  getOutgoingNominals(): Map<NodeId, NominalId>;
 }
