@@ -25,6 +25,8 @@ export type ExtractedNodes = {
  *
  * SIMPLIFIED: For now, we only propagate nominals, not types.
  * Type inference from Zod definitions is deferred.
+ * 
+ * TODO: rename this shit
  *
  * @param uri - The document URI
  * @param spec - The parsed spec document with YAML AST

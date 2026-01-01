@@ -8,6 +8,7 @@ import {
   isScalar,
   isMap,
   isSeq,
+  isPair,
 } from "yaml";
 import { Position, Range } from "vscode-languageserver-textdocument";
 import { DefinitionLink } from "vscode-languageserver";
@@ -48,12 +49,12 @@ export class YamlDocument {
   /**
    * Get the $ref string at the given position, or null if not on a $ref
    */
-  getRefAtPosition(position: Position): string | null {
+  getRefAtPosition(position: Position): { key: string; ref: string } | null {
     const offset = this.getOffsetByTextDocumentPosition(position);
-    let result: string | null = null;
+    let result: { key: string; ref: string } | null = null;
 
     visit(this.ast, {
-      Map(_key, node) {
+      Map(_key, node, ctx) {
         if (!node.range) return undefined;
         const [start, , end] = node.range;
         if (offset < start || offset > end) return visit.SKIP;
@@ -62,7 +63,15 @@ export class YamlDocument {
           (pair) => isScalar(pair.key) && pair.key.value === "$ref"
         );
         if (refPair && isScalar(refPair.value)) {
-          result = refPair.value.value as string;
+          const parent = ctx.at(-1);
+          const ref = String(refPair.value.value);
+
+          if (parent && isPair(parent) && isScalar(parent.key)) {
+            result = {
+              key: String(parent.key.value),
+              ref,
+            };
+          }
         }
         return undefined;
       },
@@ -178,7 +187,10 @@ export class YamlDocument {
           (pair) => isScalar(pair.key) && pair.key.value === "$ref"
         );
         if (refPair && isScalar(refPair.value)) {
-          const targetNodeId = new URL(String(refPair.value.value), uri).toString();
+          const targetNodeId = new URL(
+            String(refPair.value.value),
+            uri
+          ).toString();
           shapes.set(nodeId, { kind: "ref", target: targetNodeId });
         } else {
           const fields: Record<string, NodeId> = {};

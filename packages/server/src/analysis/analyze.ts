@@ -1,7 +1,6 @@
 import { OpenAPI, OpenAPIInput } from "@openapi-lsp/core/openapi";
 import { SpecDocument } from "./ServerDocument.js";
 import { ParseResult } from "./Analysis.js";
-import { getDefinitions } from "./getDefinitions.js";
 import { ZodError } from "zod";
 
 export const parseSpecDocument = async (
@@ -14,7 +13,6 @@ export const parseSpecDocument = async (
     return {
       document,
       zodError: null,
-      definitions: getDefinitions(spec, document),
     };
   } catch (e) {
     if (e instanceof ZodError) {
@@ -25,7 +23,6 @@ export const parseSpecDocument = async (
       return {
         document,
         zodError: e,
-        definitions: getDefinitions(spec, document),
       };
     } else {
       throw e;

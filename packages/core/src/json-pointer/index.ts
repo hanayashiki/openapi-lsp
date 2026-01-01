@@ -1,10 +1,16 @@
 import { Result, ok, err } from "../result/result.js";
 
 export type JsonPointerError =
+  | { type: "invalidUrl"; message: string }
   | { type: "invalidSyntax"; message: string }
   | { type: "invalidEscape"; message: string };
 
 export type JsonPointerResult = Result<JsonPointer, JsonPointerError>;
+
+export type URLJsonPointerResult = Result<
+  { url: URL; docUri: string; jsonPointer: JsonPointer },
+  JsonPointerError
+>;
 
 export type JsonPointerLoose = (string | number)[];
 
@@ -120,4 +126,40 @@ export function uriWithJsonPointerLoose(
   nextUri.hash = pointer;
 
   return nextUri.toString();
+}
+
+export function parseUriWithJsonPointer(
+  _uri: string,
+  baseUri?: string
+): URLJsonPointerResult {
+  try {
+    const url = new URL(_uri, baseUri);
+
+    const jsonPointerComponent = url.hash;
+
+    const jsonPointerResult = parseJsonPointer(jsonPointerComponent);
+
+    if (!jsonPointerResult.success) {
+      return jsonPointerResult;
+    }
+
+    return ok({
+      url,
+      get docUri() {
+        const docUrl = new URL(url);
+        docUrl.hash = "";
+
+        return docUrl.toString();
+      },
+      jsonPointer: jsonPointerResult.data,
+    });
+  } catch {
+    return {
+      success: false,
+      error: {
+        type: "invalidUrl",
+        message: "Invalid URL",
+      },
+    };
+  }
 }

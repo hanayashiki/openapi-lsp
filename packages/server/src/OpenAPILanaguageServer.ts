@@ -1,12 +1,5 @@
 import { QueryCache } from "@openapi-lsp/core/queries";
-import {
-  isRequestBody,
-  isSchema,
-  isReference,
-  isMediaType,
-  isContent,
-  isResponse,
-} from "@openapi-lsp/core/openapi";
+import { parseUriWithJsonPointer } from "@openapi-lsp/core/json-pointer";
 import { TextDocument } from "vscode-languageserver-textdocument";
 import {
   DefinitionLink,
@@ -17,23 +10,15 @@ import {
   TextDocumentChangeEvent,
   TextDocuments,
 } from "vscode-languageserver";
-import {
-  serializeSchemaToMarkdown,
-  serializeRequestBodyToMarkdown,
-  serializeRefToMarkdown,
-  serializeContentToMarkdown,
-  serializeMediaTypeToMarkdown,
-  serializeResponseToMarkdown,
-  SerializeOptions,
-} from "./serialize/index.js";
-import { getDefinitionKeyByPosition } from "./analysis/getDefinitionKeyByPosition.js";
-import { resolveRef } from "./analysis/resolveRef.js";
 import { VFS } from "./vfs/VFS.js";
 import { ServerDocumentManager } from "./analysis/DocumentManager.js";
 import { Resolver } from "./analysis/Resolver.js";
 import { Workspace } from "./workspace/Workspace.js";
 import { DocumentReferenceManager } from "./analysis/DocumentReferenceManager.js";
 import { AnalysisManager } from "./analysis/AnalysisManager.js";
+import { DocumentConnectivity } from "./analysis/Analysis.js";
+import { serializeToMarkdown } from "./serialize/index.js";
+import { OpenAPITag } from "@openapi-lsp/core/openapi";
 
 export class OpenAPILanguageServer {
   cache: QueryCache;
@@ -94,75 +79,97 @@ export class OpenAPILanguageServer {
   }
 
   async onHover(params: HoverParams): Promise<Hover | null> {
-    const spec = await this.documentManager.getServerDocument(
-      params.textDocument.uri
-    );
+    const uri = params.textDocument.uri;
+    const spec = await this.documentManager.getServerDocument(uri);
 
-    if (spec.type !== "openapi") return null;
-
-    const parseResult = await this.analysisManager.getParseResult(
-      params.textDocument.uri
-    );
-
-    // Try to find definition from $ref
-    let definition = null;
-    const refStr = spec.yaml.getRefAtPosition(params.position);
-    if (refStr) {
-      definition = resolveRef({ $ref: refStr }, parseResult);
-    }
-
-    // If not on a $ref, check if on a component key
-    if (!definition) {
-      definition = getDefinitionKeyByPosition(parseResult, params.position);
-    }
-
-    if (!definition) {
-      console.error("Cannot retrieve definition");
+    if (spec.type !== "openapi" && spec.type !== "component") {
       return null;
     }
 
-    let markdown: string | null = null;
-
-    const serializeOptions: SerializeOptions = {
-      name: definition.name,
-    };
-
-    if (isSchema(definition.component)) {
-      markdown = serializeSchemaToMarkdown(
-        definition.component,
-        serializeOptions
-      );
-    } else if (isRequestBody(definition.component)) {
-      markdown = serializeRequestBodyToMarkdown(
-        definition.component,
-        serializeOptions
-      );
-    } else if (isReference(definition.component)) {
-      markdown = serializeRefToMarkdown(definition.component, serializeOptions);
-    } else if (isMediaType(definition.component)) {
-      markdown = serializeMediaTypeToMarkdown(
-        definition.component,
-        serializeOptions
-      );
-    } else if (isContent(definition.component)) {
-      markdown = serializeContentToMarkdown(
-        definition.component,
-        serializeOptions
-      );
-    } else if (isResponse(definition.component)) {
-      markdown = serializeResponseToMarkdown(
-        definition.component,
-        serializeOptions
-      );
+    // Get $ref at position
+    const refResult = spec.yaml.getRefAtPosition(params.position);
+    if (!refResult) {
+      return null;
     }
 
-    if (!markdown) return null;
+    try {
+      // Build target NodeId
+      const pointerResult = parseUriWithJsonPointer(refResult.ref, uri);
 
-    return {
-      contents: {
-        kind: MarkupKind.Markdown,
-        value: markdown,
-      },
-    };
+      if (!pointerResult.success) {
+        return null;
+      }
+
+      const {
+        jsonPointer: targetJsonPointer,
+        url: targetUrl,
+        docUri: targetDocUri,
+      } = pointerResult.data;
+      const targetNodeId = targetUrl.toString();
+
+      // Get document connectivity
+      const dc = await this.analysisManager.documentConnectivityLoader.use([
+        "documentConnectivity",
+      ]);
+
+      if (!dc.graph.has(targetDocUri)) {
+        return null;
+      }
+
+      // Get group analysis for target
+      const groupId = DocumentConnectivity.getGroupId(dc, targetDocUri);
+      const groupResult = await this.analysisManager.groupAnalysisLoader.use([
+        "groupAnalysis",
+        groupId,
+      ]);
+
+      // Get nominal (type tag like Schema, Response, etc.)
+      const nominal = groupResult.solveResult.getCanonicalNominal(
+        targetNodeId
+      ) as OpenAPITag;
+      if (!nominal) {
+        console.info(
+          `onHover is not available because ${targetNodeId} has no nominal`
+        );
+        return null;
+      }
+
+      // Extract name from ref
+      const name = (targetJsonPointer.at(-1) ?? refResult.key) || "Unknown";
+
+      // Resolve target document and get the value at path
+      const targetDoc = await this.documentManager.getServerDocument(
+        targetNodeId
+      );
+
+      if (targetDoc.type === "tomb") return null;
+
+      const targetValue = this.getValueAtPath(
+        targetDoc.yaml.ast.toJS(),
+        targetJsonPointer
+      );
+      if (!targetValue) return null;
+
+      // Serialize based on nominal type
+      const markdown = serializeToMarkdown(nominal, targetValue, name);
+
+      return {
+        contents: {
+          kind: MarkupKind.Markdown,
+          value: markdown,
+        },
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  private getValueAtPath(obj: unknown, path: string[]): unknown {
+    let current: unknown = obj;
+    for (const segment of path) {
+      if (current === null || typeof current !== "object") return undefined;
+      current = (current as Record<string, unknown>)[segment];
+    }
+    return current;
   }
 }

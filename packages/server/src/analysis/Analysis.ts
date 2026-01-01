@@ -8,7 +8,6 @@ import { ModuleResolutionResult } from "./ModuleResolution.js";
 export interface ParseResult {
   document: OpenAPI.Document;
   zodError: ZodError | null;
-  definitions: Definition[];
 }
 
 export type DefinitionComponent =
