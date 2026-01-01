@@ -22,6 +22,7 @@ VS Code extension providing language support for OpenAPI specifications.
 ## Limitations
 
 - OpenAPI >= 3.0.0
+- Workspace folders use the same settings in `.code-workspace`
 
 ## Contributors
 

@@ -11,14 +11,15 @@
   },
   "dependencies": {
     "@openapi-lsp/core": "workspace:*",
-    "picomatch": "^4.0.2",
+    "js-md5": "^0.8.3",
+    "minimatch": "^10.0.1",
     "vscode-languageserver": "^9.0.1",
     "vscode-languageserver-textdocument": "^1.0.12",
     "yaml": "^2.6.1",
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@types/picomatch": "^3.0.1",
+    "@types/js-md5": "^0.8.0",
     "typescript": "catalog:"
   }
 }

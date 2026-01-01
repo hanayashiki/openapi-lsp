@@ -1,0 +1,9 @@
+type: object
+description: Node A references Node B
+properties:
+  id:
+    type: string
+  name:
+    type: string
+  next:
+    $ref: "./NodeB.yaml"

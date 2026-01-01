@@ -11,7 +11,6 @@
     "./json-pointer": "./src/json-pointer/index.ts",
     "./constants": "./src/constants/index.ts",
     "./solver": "./src/solver/index.ts",
-
     "./configuration": "./src/configuration/index.ts"
   },
   "scripts": {
@@ -21,12 +20,11 @@
   },
   "dependencies": {
     "js-md5": "^0.8.3",
-    "picomatch": "^4.0.3",
+    "minimatch": "^10.1.1",
     "zod": "catalog:"
   },
   "devDependencies": {
     "@types/js-md5": "^0.8.0",
-    "@types/picomatch": "^3.0.2",
     "typescript": "catalog:",
     "vitest": "^4.0.16"
   }

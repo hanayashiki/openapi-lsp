@@ -12,7 +12,7 @@ OpenAPI LSP is a VS Code Language Server Protocol implementation providing langu
 
 ```bash
 # Install dependencies
-pnpm install
+pnpm install (this is buggy in sandbox, please let user do it)
 
 # Build all packages
 npm run build
@@ -88,7 +88,7 @@ VS Code Client ←→ LSP Server ←→ QueryCache ←→ Language Features (hov
 
 - **Typebox schemas** with fallback codecs allow graceful handling of partially valid OpenAPI specs
 - **TaggedObject** wraps each OpenAPI type to enable runtime type identification via `hasOpenAPITag(obj, tag)`. Tags are stored in a `Set`, allowing objects to accumulate multiple tags when used in different contexts (intersection types). Use `getOpenAPITags(obj)` to retrieve all tags.
-- **QueryCache** tracks dependencies and automatically invalidates downstream results when sources change
+- **QueryCache** tracks dependencies and automatically invalidates downstream results when sources change. **Important**: Inside a cache loader function, always use `loader.load(ctx, key)` instead of `loader.use(key)` or direct method calls (e.g., `manager.getX()`). Using `ctx.load` ensures dependencies are properly tracked for cache invalidation.
 - **Result types** (`Ok`/`Err`) used throughout for type-safe error handling - use `andThen` for chaining
 - **ESM modules** only - no CommonJS
 

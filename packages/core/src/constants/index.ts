@@ -1,4 +1,4 @@
-import picomatch from "picomatch";
+import { minimatch } from "minimatch";
 
 export const openapiFilePatterns = [
   "*.openapi.yml",
@@ -9,13 +9,14 @@ export const openapiFilePatterns = [
 
 export const componentFilePatterns = ["*.json", "*.yml", "*.yaml"];
 
-const isOpenapiFileMatcher = picomatch(openapiFilePatterns);
-const isComponentFileMatcher = picomatch(componentFilePatterns);
+function matchesAny(filename: string, patterns: string[]): boolean {
+  return patterns.some((pattern) => minimatch(filename, pattern));
+}
 
 export function isOpenapiFile(filename: string): boolean {
-  return isOpenapiFileMatcher(filename);
+  return matchesAny(filename, openapiFilePatterns);
 }
 
 export function isComponentFile(filename: string): boolean {
-  return isComponentFileMatcher(filename);
+  return matchesAny(filename, componentFilePatterns);
 }

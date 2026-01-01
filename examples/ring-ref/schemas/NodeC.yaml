@@ -1,0 +1,9 @@
+type: object
+description: Node C references Node A (completing the ring)
+properties:
+  id:
+    type: string
+  data:
+    type: boolean
+  next:
+    $ref: "./NodeA.yaml"

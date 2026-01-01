@@ -1,0 +1,19 @@
+openapi: 3.0.3
+info:
+  title: Ring Reference Example
+  description: Demonstrates circular references across multiple files (A -> B -> C -> A)
+  version: 1.0.0
+
+paths:
+  /nodes:
+    get:
+      summary: Get all nodes
+      responses:
+        "200":
+          description: A list of nodes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "./schemas/NodeA.yaml"

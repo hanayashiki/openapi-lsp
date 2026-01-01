@@ -62,8 +62,14 @@ export class OpenAPILanguageServer {
     this.analysisManager = new AnalysisManager(
       this.workspace,
       this.documentManager,
+      this.documentReferenceManager,
+      this.vfs,
       this.cache
     );
+  }
+
+  async setup() {
+    await this.analysisManager.discoverRoots();
   }
 
   async onDidOpen(event: TextDocumentChangeEvent<TextDocument>) {

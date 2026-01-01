@@ -50,14 +50,23 @@ export type Reference = {
   resolution: ModuleResolutionResult;
 };
 
-export interface Member {
-  
-}
+export interface Member {}
 
 /**
- * A root is an OpenAPI spec, holding transitively referenced component documents.
+ * Document URI -> Referenced URIs
  */
-export interface Root {
-  rootUri: string;
+export type DocumentConnectivity = {
+  graph: Map<string, Set<string>>;
+};
 
+export namespace DocumentConnectivity {
+  export const createDefault = (): DocumentConnectivity => {
+    return {
+      graph: new Map(),
+    };
+  };
 }
+/**
+ * A group of mutual-referencing modules that must be analyzed together
+ */
+export interface AnalysisGroup {}

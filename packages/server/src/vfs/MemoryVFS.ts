@@ -1,6 +1,10 @@
-import picomatch from "picomatch";
+import { minimatch } from "minimatch";
 import { ok, err, Result } from "@openapi-lsp/core/result";
 import { VFS, VFSError, GlobEntry, GlobOptions } from "./VFS.js";
+
+function matchesAny(filename: string, patterns: string[]): boolean {
+  return patterns.some((pattern) => minimatch(filename, pattern));
+}
 
 export class MemoryVFS implements VFS {
   private files: Map<string, string>;
@@ -22,10 +26,11 @@ export class MemoryVFS implements VFS {
     options: GlobOptions
   ): Promise<GlobEntry[]> {
     const patterns = Array.isArray(pattern) ? pattern : [pattern];
-    const isMatch = picomatch(patterns);
-    const isExcluded = options.exclude
-      ? picomatch(options.exclude)
-      : () => false;
+    const excludePatterns = options.exclude
+      ? Array.isArray(options.exclude)
+        ? options.exclude
+        : [options.exclude]
+      : [];
 
     const results: GlobEntry[] = [];
     const cwd = options.cwd.endsWith("/") ? options.cwd : options.cwd + "/";
@@ -34,7 +39,10 @@ export class MemoryVFS implements VFS {
       if (!filePath.startsWith(cwd)) continue;
 
       const relativePath = filePath.slice(cwd.length);
-      if (isMatch(relativePath) && !isExcluded(relativePath)) {
+      if (
+        matchesAny(relativePath, patterns) &&
+        !matchesAny(relativePath, excludePatterns)
+      ) {
         results.push({ path: filePath, content });
       }
     }

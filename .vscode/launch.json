@@ -1,5 +1,19 @@
 {
   "version": "0.2.0",
+  "inputs": [
+    {
+      "id": "exampleFolder",
+      "type": "command",
+      "command": "workbench.action.quickOpen",
+      "args": ""
+    },
+    {
+      "id": "folderPath",
+      "type": "promptString",
+      "description": "Enter folder path relative to workspace (e.g., examples/ring-ref)",
+      "default": "examples"
+    }
+  ],
   "configurations": [
     {
       "name": "Launch Extension",
@@ -8,37 +22,7 @@
       "args": [
         "--disable-extensions",
         "--extensionDevelopmentPath=${workspaceFolder}/packages/client",
-        "${workspaceFolder}/examples"
-      ],
-      "outFiles": [
-        "${workspaceFolder}/packages/client/out/**/*.js",
-        "${workspaceFolder}/packages/server/out/**/*.js"
-      ],
-      "preLaunchTask": "npm: bundle"
-    },
-    {
-      "name": "Launch Extension (Debug Server)",
-      "type": "extensionHost",
-      "request": "launch",
-      "args": [
-        "--disable-extensions",
-        "--extensionDevelopmentPath=${workspaceFolder}/packages/client",
-        "${workspaceFolder}/examples"
-      ],
-      "outFiles": [
-        "${workspaceFolder}/packages/client/out/**/*.js",
-        "${workspaceFolder}/packages/server/out/**/*.js"
-      ],
-      "preLaunchTask": "npm: bundle"
-    },
-    {
-      "name": "Launch Extension (Display)",
-      "type": "extensionHost",
-      "request": "launch",
-      "args": [
-        "--disable-extensions",
-        "--extensionDevelopmentPath=${workspaceFolder}/packages/client",
-        "${workspaceFolder}/examples/display"
+        "${workspaceFolder}/${input:folderPath}"
       ],
       "outFiles": [
         "${workspaceFolder}/packages/client/out/**/*.js",
