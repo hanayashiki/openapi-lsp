@@ -50,4 +50,78 @@ describe("nominalPropagation", () => {
     // The root node of Pet.yaml should have canonical nominal "Schema"
     expect(petResult.solveResult.getCanonicalNominal(petUri)).toBe("Schema");
   });
+
+  it("should propagate Schema nominal through transitive refs (root → user → address)", async () => {
+    const server = createTestServer({
+      "/workspace/openapi.yaml": {
+        openapi: "3.0.0",
+        info: { title: "Transitive Nominal Test", version: "1.0.0" },
+        paths: {
+          "/users": {
+            get: {
+              responses: {
+                "200": {
+                  description: "User",
+                  content: {
+                    "application/json": {
+                      schema: { $ref: "./schemas/user.yaml#/User" },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      "/workspace/schemas/user.yaml": {
+        User: {
+          type: "object",
+          properties: {
+            name: { type: "string" },
+            address: { $ref: "./address.yaml#/Address" },
+          },
+        },
+      },
+      "/workspace/schemas/address.yaml": {
+        Address: {
+          type: "object",
+          properties: {
+            street: { type: "string" },
+            city: { type: "string" },
+          },
+        },
+      },
+    });
+
+    const dc = await server.analysisManager.discoverRoots();
+
+    const openapiUri = "file:///workspace/openapi.yaml";
+    const userUri = "file:///workspace/schemas/user.yaml";
+    const addressUri = "file:///workspace/schemas/address.yaml";
+
+    // Verify graph connectivity: openapi → user → address
+    expect(dc.graph.get(openapiUri)).toContain(userUri);
+    expect(dc.graph.get(userUri)).toContain(addressUri);
+
+    // Analyze all groups in topological order
+    await server.analysisManager.groupAnalysisLoader.use([
+      "groupAnalysis",
+      openapiUri,
+    ]);
+
+    await server.analysisManager.groupAnalysisLoader.use([
+      "groupAnalysis",
+      userUri,
+    ]);
+
+    const addressResult = await server.analysisManager.groupAnalysisLoader.use([
+      "groupAnalysis",
+      addressUri,
+    ]);
+
+    // The Address definition should have canonical nominal "Schema"
+    expect(
+      addressResult.solveResult.getCanonicalNominal(addressUri + "#/Address")
+    ).toBe("Schema");
+  });
 });

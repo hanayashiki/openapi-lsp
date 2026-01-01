@@ -7,7 +7,10 @@ import { Resolver } from "./Resolver.js";
 import { ServerDocumentManager } from "./DocumentManager.js";
 import { DocumentRef, DocumentReferences } from "./DocumentReference.js";
 import { isPositionInRange } from "./utils.js";
-import { isLocalPointer } from "@openapi-lsp/core/json-pointer";
+import {
+  isLocalPointer,
+  parseUriWithJsonPointer,
+} from "@openapi-lsp/core/json-pointer";
 import { Position } from "vscode-languageserver-textdocument";
 import { DefinitionLink } from "vscode-languageserver";
 
@@ -93,9 +96,10 @@ export class DocumentReferenceManager {
     const targetDoc = docRef.resolved.data;
     if (targetDoc.type === "tomb") return null;
 
-    // Extract fragment using native URL (dummy base for parsing relative refs)
-    const refUrl = new URL(docRef.ref, "file:///");
-    const fragment = refUrl.hash || "#";
+    // Extract fragment using parseUriWithJsonPointer
+    const parseResult = parseUriWithJsonPointer(docRef.ref, "file:///");
+    if (!parseResult.success) return null;
+    const fragment = parseResult.data.url.hash || "#";
 
     // Jump to JSON pointer location in target file (empty fragment = root = position 0)
     return targetDoc.yaml.getDefinitionLinkByRef(fragment, targetDoc.uri);

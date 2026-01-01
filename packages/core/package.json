@@ -11,7 +11,8 @@
     "./json-pointer": "./src/json-pointer/index.ts",
     "./constants": "./src/constants/index.ts",
     "./solver": "./src/solver/index.ts",
-    "./configuration": "./src/configuration/index.ts"
+    "./configuration": "./src/configuration/index.ts",
+    "./collections": "./src/collections/index.ts"
   },
   "scripts": {
     "test": "vitest run",

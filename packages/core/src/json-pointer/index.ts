@@ -128,6 +128,16 @@ export function uriWithJsonPointerLoose(
   return nextUri.toString();
 }
 
+/**
+ * Check if a nodeId belongs to a document URI.
+ * - `file:///foo.yaml` belongs to `file:///foo.yaml` ✓
+ * - `file:///foo.yaml#/User` belongs to `file:///foo.yaml` ✓
+ * - `file:///foo.yaml#/User` does NOT belong to `file:///bar.yaml` ✗
+ */
+export function isNodeInDocument(nodeId: string, documentUri: string): boolean {
+  return nodeId === documentUri || nodeId.startsWith(documentUri + "#");
+}
+
 export function parseUriWithJsonPointer(
   _uri: string,
   baseUri?: string

@@ -17,7 +17,10 @@ import {
   GroupAnalysisResult,
 } from "./Analysis.js";
 import { parseSpecDocument } from "./analyze.js";
-import { extractNodes } from "./extractNodes.js";
+import { extractNodes, extractStructuralNominals } from "./solver.js";
+import { isNodeInDocument } from "@openapi-lsp/core/json-pointer";
+import { extendMap } from "@openapi-lsp/core/collections";
+import { OpenAPITag } from "@openapi-lsp/core/openapi";
 import { Workspace } from "../workspace/Workspace.js";
 import { VFS } from "../vfs/VFS.js";
 import { md5 } from "js-md5";
@@ -101,6 +104,7 @@ export class AnalysisManager {
     this.groupAnalysisLoader = cache.createLoader(
       async ([_, groupId], ctx): Promise<GroupAnalysisResult> => {
         // 1. Load document connectivity
+        // FIXME: retrieve upstreams from context, since `documentConnectivity` is updated on every change!
         const dc = await this.documentConnectivityLoader.load(ctx, [
           "documentConnectivity",
         ]);
@@ -118,7 +122,10 @@ export class AnalysisManager {
           ]);
 
           // Collect outgoing types/nominals from upstream
-          for (const [nodeId, type] of upstream.solveResult.getOutgoingTypes()) {
+          for (const [
+            nodeId,
+            type,
+          ] of upstream.solveResult.getOutgoingTypes()) {
             if (!incomingTypes.has(nodeId)) incomingTypes.set(nodeId, []);
             incomingTypes.get(nodeId)!.push(type);
           }
@@ -126,8 +133,7 @@ export class AnalysisManager {
             nodeId,
             nominal,
           ] of upstream.solveResult.getOutgoingNominals()) {
-            if (!incomingNominals.has(nodeId))
-              incomingNominals.set(nodeId, []);
+            if (!incomingNominals.has(nodeId)) incomingNominals.set(nodeId, []);
             incomingNominals.get(nodeId)!.push(nominal);
           }
         }
@@ -146,18 +152,39 @@ export class AnalysisManager {
               "specDocument.parse",
               uri,
             ]);
-            const { nodes, nominals, outgoingNominals } = extractNodes(uri, doc, parseResult.document);
+            const { nodes, nominals, outgoingNominals } = extractNodes(
+              uri,
+              doc,
+              parseResult.document
+            );
 
-            for (const [k, v] of nodes) allNodes.set(k, v);
-            for (const [k, v] of nominals) allNominals.set(k, v);
-            // outgoingNominals tells us what type external targets should be
-            // Add these to allNominals so the solver assigns them to external nodes
-            for (const [k, v] of outgoingNominals) allNominals.set(k, v);
+            extendMap(allNodes, nodes);
+            extendMap(allNominals, nominals);
+            extendMap(allNominals, outgoingNominals);
           }
-          // Component files: nodes only, no nominals (they come from incomingNominals)
+          // Component files: nodes from YAML, nominals from structural propagation
           else if (doc.type === "component") {
             const shapes = doc.yaml.collectLocalShapes(uri);
-            for (const [k, v] of shapes) allNodes.set(k, v);
+            extendMap(allNodes, shapes);
+
+            // For nodes with incoming nominals, extract structural nominals
+            // This propagates nominals through the component's structure
+            for (const [nodeId, incomings] of incomingNominals) {
+              // Only process nodes that belong to this document
+              if (!isNodeInDocument(nodeId, uri)) continue;
+
+              for (const incomingNominal of incomings) {
+                const { outgoing, local } =
+                  extractStructuralNominals(
+                    uri,
+                    doc,
+                    nodeId,
+                    incomingNominal as OpenAPITag
+                  ) ?? {};
+                extendMap(allNominals, outgoing);
+                extendMap(allNominals, local);
+              }
+            }
           }
         }
 
@@ -264,7 +291,11 @@ export class AnalysisManager {
     const sccComponents: Set<string>[] = [];
     let sccIndex = 0;
 
-    const dfsBuildSccs = (uri: string, component: Set<string>, index: number) => {
+    const dfsBuildSccs = (
+      uri: string,
+      component: Set<string>,
+      index: number
+    ) => {
       if (visited.has(uri)) return;
       visited.add(uri);
       component.add(uri);
@@ -298,8 +329,8 @@ export class AnalysisManager {
     }
 
     // Step 5: Map numeric indices to string group IDs and populate dc
-    const sccIndexToGroupId: string[] = sccComponents.map((component) =>
-      [...component].sort()[0]
+    const sccIndexToGroupId: string[] = sccComponents.map(
+      (component) => [...component].sort()[0]
     );
 
     for (let i = 0; i < sccComponents.length; i++) {

@@ -114,6 +114,30 @@ export const visit = (input: VisitInput, visitor: Visitor) => {
   });
 };
 
+/**
+ * Visit a fragment of an OpenAPI document starting from a non-root node.
+ * Used for component files where we parse a subtree with a known nominal type.
+ *
+ * @param openapiNode - The parsed OpenAPI fragment (e.g., Schema, Response)
+ * @param astNode - The YAML AST node corresponding to the fragment
+ * @param basePath - The JSON pointer path prefix for the fragment
+ * @param visitor - The visitor callbacks
+ */
+export const visitFragment = (
+  openapiNode: object,
+  astNode: YAMLMap,
+  basePath: SpecDocumentPath,
+  visitor: Visitor
+) => {
+  _visit({
+    currentPath: basePath,
+    currentAstNode: astNode,
+    currentOpenAPINode: openapiNode,
+    visitor,
+    currentLink: undefined,
+  });
+};
+
 const _visit = ({
   currentPath,
   currentAstNode,

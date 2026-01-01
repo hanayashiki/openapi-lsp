@@ -14,6 +14,7 @@ import { Position, Range } from "vscode-languageserver-textdocument";
 import { DefinitionLink } from "vscode-languageserver";
 import {
   parseJsonPointer,
+  parseUriWithJsonPointer,
   isLocalPointer,
   uriWithJsonPointerLoose,
   JsonPointerLoose,
@@ -135,6 +136,44 @@ export class YamlDocument {
     };
   }
 
+  /**
+   * Get the AST node at a given JSON pointer path.
+   * Returns null if the path doesn't exist.
+   */
+  getNodeAtPath(path: JsonPointerLoose): Node | null {
+    let currentNode: Node | null = this.ast.contents;
+
+    for (const segment of path) {
+      if (currentNode === null) return null;
+
+      if (typeof segment === "number") {
+        // Array index
+        if (!isSeq(currentNode)) return null;
+        currentNode = currentNode.items[segment] as Node | null;
+      } else {
+        // Object key
+        if (!isMap(currentNode)) return null;
+        const pair = currentNode.items.find(
+          (p) => isScalar(p.key) && p.key.value === segment
+        );
+        if (!pair) return null;
+        currentNode = pair.value as Node | null;
+      }
+    }
+
+    return currentNode;
+  }
+
+  /**
+   * Get the JavaScript value at a given JSON pointer path.
+   * Returns undefined if the path doesn't exist.
+   */
+  getValueAtPath(path: JsonPointerLoose): unknown {
+    const node = this.getNodeAtPath(path);
+    if (!node) return undefined;
+    return node.toJSON();
+  }
+
   collectRefs(): CollectedRef[] {
     let refs: CollectedRef[] = [];
 
@@ -187,11 +226,14 @@ export class YamlDocument {
           (pair) => isScalar(pair.key) && pair.key.value === "$ref"
         );
         if (refPair && isScalar(refPair.value)) {
-          const targetNodeId = new URL(
+          const targetResult = parseUriWithJsonPointer(
             String(refPair.value.value),
             uri
-          ).toString();
-          shapes.set(nodeId, { kind: "ref", target: targetNodeId });
+          );
+          if (targetResult.success) {
+            const targetNodeId = targetResult.data.url.toString();
+            shapes.set(nodeId, { kind: "ref", target: targetNodeId });
+          }
         } else {
           const fields: Record<string, NodeId> = {};
           for (const pair of node.items) {

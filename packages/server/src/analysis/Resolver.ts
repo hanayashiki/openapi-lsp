@@ -9,6 +9,7 @@ import {
   CacheLoader,
   QueryCache,
 } from "@openapi-lsp/core/queries";
+import { parseUriWithJsonPointer } from "@openapi-lsp/core/json-pointer";
 
 export class Resolver {
   loader: CacheLoader<["resolver", ModuleResolutionInput], ModuleResolutionResult>;
@@ -19,16 +20,13 @@ export class Resolver {
   ) {
     this.loader = cache.createLoader(
       async ([_, input], ctx): Promise<ModuleResolutionResult> => {
-        let resolvedUrl: URL;
-        try {
-          // Use native URL for resolution - handles ../ correctly
-          resolvedUrl = new URL(input.ref, input.baseUri);
-        } catch {
+        // Use parseUriWithJsonPointer for resolution - handles ../ correctly
+        const parseResult = parseUriWithJsonPointer(input.ref, input.baseUri);
+        if (!parseResult.success) {
           return err({ type: "invalidUri" });
         }
 
-        // Strip fragment for file resolution
-        resolvedUrl.hash = "";
+        const resolvedUrl = parseResult.data.url;
 
         if (resolvedUrl.protocol !== "file:") {
           return err({
@@ -37,7 +35,8 @@ export class Resolver {
           });
         }
 
-        const resolvedUri = resolvedUrl.href;
+        // Use docUri which has fragment stripped
+        const resolvedUri = parseResult.data.docUri;
 
         // Use documentManager.load for proper dependency tracking
         return ok(await this.documentManager.load(ctx, resolvedUri));
