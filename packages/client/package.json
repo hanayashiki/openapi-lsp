@@ -52,7 +52,22 @@
         "command": "openapi-lsp.restart",
         "title": "OpenAPI: Restart Language Server"
       }
-    ]
+    ],
+    "configuration": {
+      "title": "OpenAPI LSP",
+      "properties": {
+        "openapi-lsp.discoverRoots.pattern": {
+          "type": "string",
+          "default": "**/*",
+          "description": "The [minimatch](https://www.npmjs.com/package/minimatch) glob pattern to ignore during OpenAPI document discovery"
+        },
+        "openapi-lsp.discoverRoots.ignore": {
+          "type": "string",
+          "default": "{**/node_modules/**,**/.git/**,**/.hg/**}",
+          "description": "The [minimatch](https://www.npmjs.com/package/minimatch) glob pattern to ignore during OpenAPI document discovery"
+        }
+      }
+    }
   },
   "activationEvents": [
     "workspaceContains:**/*.openapi.yml",
@@ -77,6 +92,7 @@
     "@vscode/vsce": "^3.2.1",
     "esbuild": "catalog:",
     "typescript": "catalog:",
-    "@openapi-lsp/core": "workspace:*"
+    "@openapi-lsp/core": "workspace:*",
+    "zod": "catalog:"
   }
 }

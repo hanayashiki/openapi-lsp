@@ -43,7 +43,6 @@ export class OpenAPILanguageServer {
   analysisManager: AnalysisManager;
 
   constructor(
-    // @ts-expect-error will use it
     private workspace: Workspace,
     private documents: TextDocuments<TextDocument>,
     private vfs: VFS
@@ -60,7 +59,11 @@ export class OpenAPILanguageServer {
       this.resolver,
       this.cache
     );
-    this.analysisManager = new AnalysisManager(this.documentManager, this.cache);
+    this.analysisManager = new AnalysisManager(
+      this.workspace,
+      this.documentManager,
+      this.cache
+    );
   }
 
   async onDidOpen(event: TextDocumentChangeEvent<TextDocument>) {

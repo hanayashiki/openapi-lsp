@@ -1,0 +1,3 @@
+{
+    "openapi-lsp.discoverRoots.ignore": "{**/node_modules/**,**/.git/**,**/.hg/**}"
+}

@@ -63,7 +63,15 @@ connection.onInitialize((params: InitializeParams): InitializeResult => {
 });
 
 connection.onInitialized(() => {
-  console.log("OpenAPI Language Server initialized");
+  console.info(
+    `OpenAPI Language Server initialized${
+      typeof process?.versions.node !== "undefined"
+        ? ` on node: ${process.versions.node}. `
+        : typeof navigator !== "undefined"
+        ? ` on ${navigator.userAgent}. `
+        : ". "
+    }`
+  );
 });
 
 documents.listen(connection);

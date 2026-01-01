@@ -49,3 +49,15 @@ export type Reference = {
    */
   resolution: ModuleResolutionResult;
 };
+
+export interface Member {
+  
+}
+
+/**
+ * A root is an OpenAPI spec, holding transitively referenced component documents.
+ */
+export interface Root {
+  rootUri: string;
+
+}

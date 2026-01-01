@@ -6,11 +6,13 @@ import {
 import { ServerDocumentManager } from "./DocumentManager.js";
 import { Analysis } from "./Analysis.js";
 import { analyzeSpecDocument } from "./analyze.js";
+import { Workspace } from "../workspace/Workspace.js";
 
 export class AnalysisManager {
   loader: CacheLoader<["specDocument.analyze", string], Analysis>;
 
   constructor(
+    private workspace: Workspace,
     private documentManager: ServerDocumentManager,
     cache: QueryCache
   ) {
@@ -33,5 +35,9 @@ export class AnalysisManager {
 
   load = (ctx: CacheComputeContext, uri: string): Promise<Analysis> => {
     return this.loader.load(ctx, ["specDocument.analyze", uri]);
+  };
+
+  discoverRoots = async () => {
+    console.info(this.workspace);
   };
 }

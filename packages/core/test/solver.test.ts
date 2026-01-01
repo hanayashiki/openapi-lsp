@@ -22,8 +22,14 @@ describe("Solver", () => {
     const result = solver.solve();
     expect(result.ok).toBe(true);
 
-    expect(solver.getType("file#/name")).toEqual({ kind: "prim", prim: "string" });
-    expect(solver.getType("file#/count")).toEqual({ kind: "prim", prim: "number" });
+    expect(solver.getType("file#/name")).toEqual({
+      kind: "prim",
+      prim: "string",
+    });
+    expect(solver.getType("file#/count")).toEqual({
+      kind: "prim",
+      prim: "number",
+    });
     expect(solver.getType("file#/obj")).toEqual({
       kind: "object",
       fields: {
@@ -64,11 +70,18 @@ describe("Solver", () => {
     expect(result.ok).toBe(true);
 
     // All three should be in same equivalence class
-    expect(solver.getClassId("file#/target")).toBe(solver.getClassId("file#/ref1"));
-    expect(solver.getClassId("file#/ref1")).toBe(solver.getClassId("file#/ref2"));
+    expect(solver.getClassId("file#/target")).toBe(
+      solver.getClassId("file#/ref1")
+    );
+    expect(solver.getClassId("file#/ref1")).toBe(
+      solver.getClassId("file#/ref2")
+    );
 
     // All should have the same type
-    expect(solver.getType("file#/ref2")).toEqual({ kind: "prim", prim: "string" });
+    expect(solver.getType("file#/ref2")).toEqual({
+      kind: "prim",
+      prim: "string",
+    });
   });
 
   it("reports MISSING_TARGET for ref to non-existent node", () => {
@@ -131,16 +144,24 @@ describe("Solver", () => {
       kind: "object",
       fields: { name: "file#/components/schemas/Pet/name" },
     });
-    solver.addNode("file#/components/schemas/Pet/name", { kind: "prim", value: "Fluffy" });
+    solver.addNode("file#/components/schemas/Pet/name", {
+      kind: "prim",
+      value: "Fluffy",
+    });
     solver.setNominalAnchor("file#/components/schemas/Pet", "Pet");
 
-    solver.addNode("file#/paths/pet", { kind: "ref", target: "file#/components/schemas/Pet" });
+    solver.addNode("file#/paths/pet", {
+      kind: "ref",
+      target: "file#/components/schemas/Pet",
+    });
 
     const result = solver.solve();
     expect(result.ok).toBe(true);
 
     // Both nodes should have the same nominal
-    expect(solver.getCanonicalNominal("file#/components/schemas/Pet")).toBe("Pet");
+    expect(solver.getCanonicalNominal("file#/components/schemas/Pet")).toBe(
+      "Pet"
+    );
     expect(solver.getCanonicalNominal("file#/paths/pet")).toBe("Pet");
   });
 
