@@ -79,7 +79,6 @@ export class AnalysisManager {
         // Compute SCCs using Kosaraju's algorithm
         this.computeAnalysisGroups(dc);
 
-        AnalysisManager.logGraphviz(dc);
         return dc;
       }
     );

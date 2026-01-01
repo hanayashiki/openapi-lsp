@@ -1,2 +1,3 @@
 set -e
 pnpm check
+pnpm test

@@ -113,8 +113,8 @@ function main() {
 
   writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2) + "\n");
 
-  console.log("Updated package.json with configuration:");
-  console.log(JSON.stringify(configProperties, null, 2));
+  console.info("Updated package.json with configuration:");
+  console.info(JSON.stringify(configProperties, null, 2));
 }
 
 main();
