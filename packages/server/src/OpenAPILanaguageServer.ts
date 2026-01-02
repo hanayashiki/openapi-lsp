@@ -137,7 +137,7 @@ export class OpenAPILanguageServer {
         targetDocUri = pointerResult.data.docUri;
         targetNodeId = pointerResult.data.url.toString();
         targetPath = pointerResult.data.jsonPointer;
-        name = keyResult.key; // Keep the original key name for display
+        name = String(targetPath.at(-1) ?? keyValue.$ref) || "Unknown";
       } else {
         // Regular value - use as-is
         targetDocUri = uri;
@@ -153,9 +153,7 @@ export class OpenAPILanguageServer {
         "documentConnectivity",
       ]);
       if (!dc.graph.has(targetDocUri)) {
-        console.error(
-          `[onHover] targetDocUri not in graph: ${targetDocUri}`
-        );
+        console.error(`[onHover] targetDocUri not in graph: ${targetDocUri}`);
         return null;
       }
 
