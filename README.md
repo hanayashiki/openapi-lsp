@@ -14,21 +14,33 @@ Intelligent language support for OpenAPI/Swagger specifications in VS Code, desi
 
 #### Inspect OpenAPI Documents
 
-Hover over schemas to see them rendered as TypeScript types:
+Hover over schemas to see them rendered as TypeScript types.
+
+<details>
+<summary>Screenshot</summary>
 
 ![Hover OpenAPI schema](/docs/hover-openapi.png)
+</details>
 
 #### Inspect Referenced Files
 
-Hover over `$ref` targets to see how they're used in context:
+Hover over `$ref` targets to see how they're used in context.
+
+<details>
+<summary>Screenshot</summary>
 
 ![Referenced file hover](/docs/ref-hover.png)
+</details>
 
 ### Go to Definition
 
-Jump directly to component definitions or peek them inline:
+Jump directly to component definitions or peek them inline.
+
+<details>
+<summary>Screenshot</summary>
 
 ![Go to definition](/docs/def.png)
+</details>
 
 ## Installation
 
