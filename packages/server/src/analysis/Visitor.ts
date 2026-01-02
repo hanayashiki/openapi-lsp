@@ -161,6 +161,7 @@ const _visit = ({
 
       const key = pair.key.value as string;
       const nextAstNode = pair.value;
+      // oxlint-disable-next-line
       const nextOpenAPINode = (currentOpenAPINode as any)[key];
       const nextPath = [...currentPath, key];
 
@@ -198,6 +199,7 @@ const _visit = ({
         continue;
       }
 
+      // oxlint-disable-next-line
       const nextOpenAPINode = (currentOpenAPINode as any)[i];
       const nextPath = [...currentPath, i];
 

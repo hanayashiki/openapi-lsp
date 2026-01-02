@@ -23,6 +23,7 @@ interface ZodInternalDef {
 }
 
 function getDef(zodType: z.ZodTypeAny): ZodInternalDef {
+  // oxlint-disable-next-line no-explicit-any
   return (zodType as any)._zod.def;
 }
 

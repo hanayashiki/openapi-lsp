@@ -30,13 +30,13 @@ async function build() {
       esbuild.context(serverConfig),
     ]);
     await Promise.all([clientCtx.watch(), serverCtx.watch()]);
-    console.log("Watching for changes...");
+    console.info("Watching for changes...");
   } else {
     await Promise.all([
       esbuild.build(clientConfig),
       esbuild.build(serverConfig),
     ]);
-    console.log("Build complete");
+    console.info("Build complete");
   }
 }
 

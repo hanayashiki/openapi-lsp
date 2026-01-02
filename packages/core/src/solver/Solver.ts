@@ -89,7 +89,6 @@ class SolveResultImpl implements SolveResult {
 
   private assertNodeExists(node: NodeId): void {
     if (!this.inputNodeIds.has(node)) {
-      console.debug(this.inputNodeIds)
       throw new Error(`Node "${node}" was not in the solver input`);
     }
   }

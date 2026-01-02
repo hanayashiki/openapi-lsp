@@ -4,6 +4,7 @@ import { isReference } from "./utils.js";
 import { serializeRef } from "./serializeRef.js";
 import { serializePrimitive } from "./serializePrimitive.js";
 import { serializeObject } from "./serializeObject.js";
+// oxlint-disable-next-line
 import { serializeArray } from "./serializeArray.js";
 import { serializeComposition } from "./serializeComposition.js";
 

@@ -1,5 +1,6 @@
 import { OpenAPI } from "@openapi-lsp/core/openapi";
 import type { SerializerContext } from "./types.js";
+// oxlint-disable-next-line
 import { serializeSchemaOrRef } from "./serializeSchema.js";
 
 // Serialize array schema
