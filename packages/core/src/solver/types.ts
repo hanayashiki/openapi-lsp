@@ -13,16 +13,6 @@ export type NominalId = string;
 export type ClassId = number;
 
 /**
- * JSON structural type (output of the solver).
- * Represents the document's own structure, NOT OpenAPI schema semantics.
- */
-export type JSONType =
-  | { kind: "prim"; prim: "null" | "bool" | "number" | "string" }
-  | { kind: "array"; elem: JSONType }
-  | { kind: "object"; fields: Record<string, JSONType> }
-  | { kind: "typevar" }; // Unresolved type (e.g., isolated $ref cycle)
-
-/**
  * Local shape fact (input to the solver).
  * Represents a JSON literal structure with $ref extensions.
  * Note: Composite types (array/object) reference child nodes by NodeId,
@@ -50,20 +40,13 @@ export type Class = {
 /**
  * Diagnostic errors from the solver.
  */
-export type Diagnostic =
-  | {
-      code: "NOMINAL_CONFLICT";
-      a: NominalId;
-      b: NominalId;
-      proofA: Reason[];
-      proofB: Reason[];
-    }
-  | {
-      code: "STRUCT_CONFLICT";
-      node: NodeId;
-      left: JSONType;
-      right: JSONType;
-    };
+export type Diagnostic = {
+  code: "NOMINAL_CONFLICT";
+  a: NominalId;
+  b: NominalId;
+  proofA: Reason[];
+  proofB: Reason[];
+};
 
 /**
  * Reason for diagnostic proof paths.
@@ -82,11 +65,6 @@ export type SolverInput = {
   /** Nominal anchors mapping nodes to nominal identifiers */
   nominals: Map<NodeId, NominalId>;
   /**
-   * Pre-resolved types from referencing SCCs.
-   * Multiple types for the same node will be unified; conflicts emit STRUCT_CONFLICT.
-   */
-  incomingTypes?: Map<NodeId, JSONType[]>;
-  /**
    * Pre-resolved nominals from referencing SCCs.
    * Multiple nominals for the same node will cause NOMINAL_CONFLICT if they differ.
    */
@@ -104,12 +82,6 @@ export interface SolveResult {
   readonly diagnostics: readonly Diagnostic[];
 
   /**
-   * Get the resolved type for a node.
-   * @throws Error if the node was not in the input
-   */
-  getType(node: NodeId): JSONType;
-
-  /**
    * Get the equivalence class ID for a node.
    * @throws Error if the node was not in the input
    */
@@ -121,12 +93,6 @@ export interface SolveResult {
    * @throws Error if the node was not in the input
    */
   getCanonicalNominal(node: NodeId): NominalId | null;
-
-  /**
-   * Get types for external refs (nodes referenced but not in input).
-   * These are the types this SCC expects from referenced SCCs.
-   */
-  getOutgoingTypes(): Map<NodeId, JSONType>;
 
   /**
    * Get nominals for external refs (nodes referenced but not in input).

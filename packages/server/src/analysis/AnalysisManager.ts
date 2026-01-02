@@ -8,7 +8,6 @@ import {
   LocalShape,
   NodeId,
   NominalId,
-  JSONType,
 } from "@openapi-lsp/core/solver";
 import { ServerDocumentManager } from "./DocumentManager.js";
 import {
@@ -109,8 +108,7 @@ export class AnalysisManager {
           "documentConnectivity",
         ]);
 
-        // 2. Get incoming types/nominals from upstream groups
-        const incomingTypes = new Map<NodeId, JSONType[]>();
+        // 2. Get incoming nominals from upstream groups
         const incomingNominals = new Map<NodeId, NominalId[]>();
 
         const upstreamGroupIds =
@@ -121,14 +119,7 @@ export class AnalysisManager {
             upstreamId,
           ]);
 
-          // Collect outgoing types/nominals from upstream
-          for (const [
-            nodeId,
-            type,
-          ] of upstream.solveResult.getOutgoingTypes()) {
-            if (!incomingTypes.has(nodeId)) incomingTypes.set(nodeId, []);
-            incomingTypes.get(nodeId)!.push(type);
-          }
+          // Collect outgoing nominals from upstream
           for (const [
             nodeId,
             nominal,
@@ -193,7 +184,6 @@ export class AnalysisManager {
         const solveResult = solver.solve({
           nodes: allNodes,
           nominals: allNominals,
-          incomingTypes,
           incomingNominals,
         });
 

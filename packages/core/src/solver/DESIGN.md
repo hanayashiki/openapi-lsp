@@ -1,9 +1,8 @@
-# OpenAPI Document Structure Type Solver
+# OpenAPI Document Structure Solver
 
 > **Goal:**
-> Solve the **document's own structural types** (JSON shape) for split OpenAPI JSON/YAML document nodes.
-> Supports `$ref` equivalence propagation, recursion, nominal naming, and conflict detection.
-> - Does NOT solve OpenAPI schema semantic types (string/object API meanings)
+> Build equivalence classes from `$ref` connections and propagate nominal type anchors.
+> - Does NOT compute structural types (JSON shapes) - that's handled by schema validation
 > - Does NOT handle incremental caching (handled by upper layers)
 > - Supports incremental analysis via SCC (Strongly Connected Components) ordering
 
@@ -24,41 +23,24 @@ Represents a JSON node in the document. Examples:
 
 ---
 
-### 1.2 Document Structure Type (JSON Shape)
-
-```ts
-type JSONType =
-  | { kind: "prim"; prim: "null" | "bool" | "number" | "string" }
-  | { kind: "array"; elem: JSONType }
-  | { kind: "object"; fields: Record<string, JSONType> }
-  | { kind: "typevar" };  // Unresolved type (e.g., isolated $ref cycle)
-```
-
-> Note: `typevar` represents unresolved types in cyclic references.
-> Nominals are tracked separately via the `nominals` map, not as a JSONType variant.
-
----
-
-### 1.3 Local Shape (Solver Input)
+### 1.2 Local Shape (Solver Input)
 
 The solver's input consists of "facts" - JSON literals with $ref extensions.
-Each JSON path has its own node; composite types reference children by NodeId.
+Only the `kind` and `target` fields are used by the solver.
 
 ```ts
 type LocalShape =
   | { kind: "prim"; value: string | null | boolean | number }
   | { kind: "ref"; target: NodeId }
-  | { kind: "array"; fields: Record<string, NodeId> }   // keys are stringified indices
-  | { kind: "object"; fields: Record<string, NodeId> }; // keys are field names
+  | { kind: "array"; fields: Record<string, NodeId> }
+  | { kind: "object"; fields: Record<string, NodeId> };
 ```
 
-> Notes:
-> - `ref` represents `$ref` with **identity/substitution semantics**
-> - Arrays and objects both use `fields: Record<string, NodeId>` - the `kind` tag differentiates them
+> Note: `ref` represents `$ref` with **identity/substitution semantics**
 
 ---
 
-### 1.4 Equivalence Class
+### 1.3 Equivalence Class
 
 `$ref` creates equivalence relations. All nodes connected via `$ref` belong to the same class.
 
@@ -155,12 +137,12 @@ This produces a `NOMINAL_CONFLICT` diagnostic because `Pet` cannot be both a "Sc
 
 ## 3. Solver Algorithm
 
-The solver operates in two phases:
+The solver operates in a single phase:
 
-### Phase 1: Build Equivalence Classes
+### Build Equivalence Classes and Assign Nominals
 
 ```
-buildEquivalenceClasses():
+solve(input):
   uf = new UnionFind()
 
   // Initialize all input nodes
@@ -176,7 +158,7 @@ buildEquivalenceClasses():
         uf.makeSet(target)
       uf.union(node, target)
 
-  // Extract components and assign class IDs
+  // Extract components and assign class IDs + nominals
   for each component in uf.getComponents():
     classId = nextId++
     class = { id: classId, nodes: component, nominal: null }
@@ -198,45 +180,6 @@ buildEquivalenceClasses():
       emit NOMINAL_CONFLICT diagnostic
 ```
 
-### Phase 2: Compute Types
-
-```
-computeTypes():
-  pendingClasses = all class IDs
-
-  // Iterative processing (leaves first)
-  while pendingClasses is not empty and making progress:
-    for each classId in pendingClasses:
-      if all dependencies resolved:
-        type = unifyClass(classId)
-        if type is not null:
-          classTypes.set(classId, type)
-          pendingClasses.remove(classId)
-
-  // Remaining classes get typevar (cycles)
-  for each classId in pendingClasses:
-    classTypes.set(classId, { kind: "typevar" })
-
-unifyClass(class):
-  // Collect incoming types and concrete shapes
-  unifiedType = { kind: "typevar" }
-
-  for each incoming type:
-    unifiedType = unify(unifiedType, type)
-    if unifiedType is null:
-      emit STRUCT_CONFLICT diagnostic
-      return null
-
-  for each non-ref shape in class:
-    shapeType = shapeToType(shape)
-    unifiedType = unify(unifiedType, shapeType)
-    if unifiedType is null:
-      emit STRUCT_CONFLICT diagnostic
-      return null
-
-  return unifiedType
-```
-
 ---
 
 ## 4. SCC Integration
@@ -255,9 +198,7 @@ Documents form a dependency graph via `$ref`. The upper layer uses Kosaraju's al
 ┌──────────────────┐     ┌──────────────────┐     ┌──────────────────┐
 │   SCC 1 (root)   │────▶│   SCC 2 (middle) │────▶│   SCC 3 (leaf)   │
 │                  │     │                  │     │                  │
-│ outgoingTypes    │     │ incomingTypes    │     │ incomingTypes    │
 │ outgoingNominals │     │ incomingNominals │     │ incomingNominals │
-│                  │     │ outgoingTypes    │     │                  │
 │                  │     │ outgoingNominals │     │                  │
 └──────────────────┘     └──────────────────┘     └──────────────────┘
 ```
@@ -271,7 +212,7 @@ Documents form a dependency graph via `$ref`. The upper layer uses Kosaraju's al
 ```ts
 class Solver {
   /**
-   * Solve the type system: build equivalence classes and unify types.
+   * Build equivalence classes and assign nominals.
    * Stateless - all input provided upfront, all output via SolveResult.
    */
   solve(input: SolverInput): SolveResult;
@@ -288,9 +229,6 @@ type SolverInput = {
   /** Nominal anchors mapping nodes to nominal identifiers */
   nominals: Map<NodeId, NominalId>;
 
-  /** Pre-resolved types from upstream SCCs (optional) */
-  incomingTypes?: Map<NodeId, JSONType[]>;
-
   /** Pre-resolved nominals from upstream SCCs (optional) */
   incomingNominals?: Map<NodeId, NominalId[]>;
 };
@@ -306,17 +244,11 @@ interface SolveResult {
   /** All diagnostics produced during solving */
   readonly diagnostics: readonly Diagnostic[];
 
-  /** Get the resolved type for a node */
-  getType(node: NodeId): JSONType;
-
   /** Get the equivalence class ID for a node */
   getClassId(node: NodeId): ClassId;
 
   /** Get the canonical nominal for a node's equivalence class */
   getCanonicalNominal(node: NodeId): NominalId | null;
-
-  /** Get types for external refs (for downstream SCCs) */
-  getOutgoingTypes(): Map<NodeId, JSONType>;
 
   /** Get nominals for external refs (for downstream SCCs) */
   getOutgoingNominals(): Map<NodeId, NominalId>;
@@ -328,20 +260,13 @@ interface SolveResult {
 ## 6. Diagnostics
 
 ```ts
-type Diagnostic =
-  | {
-      code: "NOMINAL_CONFLICT";
-      a: NominalId;
-      b: NominalId;
-      proofA: Reason[];  // Path showing how 'a' was assigned
-      proofB: Reason[];  // Path showing how 'b' was assigned
-    }
-  | {
-      code: "STRUCT_CONFLICT";
-      node: NodeId;
-      left: JSONType;   // First type
-      right: JSONType;  // Conflicting type
-    };
+type Diagnostic = {
+  code: "NOMINAL_CONFLICT";
+  a: NominalId;
+  b: NominalId;
+  proofA: Reason[];  // Path showing how 'a' was assigned
+  proofB: Reason[];  // Path showing how 'b' was assigned
+};
 
 type Reason =
   | { kind: "ref"; from: NodeId; to: NodeId; raw?: string }
@@ -353,14 +278,12 @@ type Reason =
 
 ## 7. Design Principles
 
-1. **Document structure types, not OpenAPI schema semantics** - We solve what the JSON looks like, not what it means
-2. **`$ref` is identity/substitution** - Nodes connected by `$ref` are equivalent
-3. **No widening or merging** - Equivalence class members must be structurally identical
-4. **No subtyping between classes** - Each class is independent
-5. **Nominals are naming layer only** - They don't participate in structural solving
-6. **Conflicts are errors** - No silent resolution, always report with proof paths
-7. **Stateless solver** - All input provided upfront, enables incremental caching at upper layer
+1. **`$ref` is identity/substitution** - Nodes connected by `$ref` are equivalent
+2. **Nominals propagate through equivalence** - All nodes in a class share the same nominal
+3. **Conflicts are errors** - No silent resolution, always report with proof paths
+4. **Stateless solver** - All input provided upfront, enables incremental caching at upper layer
+5. **No structural type checking** - Schema validation is handled separately
 
 ---
 
-> **Essence:** Equivalence classes (`$ref`) + Structural consistency (unify) + Nominal naming layer + SCC-based incremental analysis
+> **Essence:** Equivalence classes (`$ref`) + Nominal propagation + SCC-based incremental analysis
