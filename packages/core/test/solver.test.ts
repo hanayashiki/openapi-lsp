@@ -74,7 +74,7 @@ describe("Solver", () => {
             { kind: "ref", target: "file#/components/schemas/Pet" },
           ],
         ]),
-        nominals: new Map([["file#/components/schemas/Pet", "Pet"]]),
+        nominals: new Map([["file#/components/schemas/Pet", ["Pet"]]]),
       });
 
       expect(result.ok).toBe(true);
@@ -93,8 +93,8 @@ describe("Solver", () => {
           ["file#/b", { kind: "ref", target: "file#/a" }],
         ]),
         nominals: new Map([
-          ["file#/a", "TypeA"],
-          ["file#/b", "TypeB"],
+          ["file#/a", ["TypeA"]],
+          ["file#/b", ["TypeB"]],
         ]),
       });
 
@@ -131,7 +131,7 @@ describe("Solver", () => {
         nodes: new Map<string, LocalShape>([
           ["file#/a", { kind: "ref", target: "external#/Pet" }],
         ]),
-        nominals: new Map([["file#/a", "Pet"]]),
+        nominals: new Map([["file#/a", ["Pet"]]]),
       });
 
       expect(result.ok).toBe(true);
@@ -147,7 +147,7 @@ describe("Solver", () => {
           ["file#/a", { kind: "ref", target: "external#/schema" }],
           ["file#/b", { kind: "ref", target: "external#/schema" }],
         ]),
-        nominals: new Map([["file#/a", "Schema"]]),
+        nominals: new Map([["file#/a", ["Schema"]]]),
       });
 
       expect(result.ok).toBe(true);
@@ -172,31 +172,29 @@ describe("Solver", () => {
     });
   });
 
-  describe("incomingNominals", () => {
-    it("assigns incoming nominal to equivalence class", () => {
+  describe("multiple nominals", () => {
+    it("assigns nominal from array to equivalence class", () => {
       const solver = new Solver();
 
       const result = solver.solve({
         nodes: new Map<string, LocalShape>([
           ["file#/a", { kind: "prim", value: "hello" }],
         ]),
-        nominals: new Map(),
-        incomingNominals: new Map([["file#/a", ["Pet"]]]),
+        nominals: new Map([["file#/a", ["Pet"]]]),
       });
 
       expect(result.ok).toBe(true);
       expect(result.getCanonicalNominal("file#/a")).toBe("Pet");
     });
 
-    it("conflicting incoming nominals emit NOMINAL_CONFLICT", () => {
+    it("conflicting nominals in array emit NOMINAL_CONFLICT", () => {
       const solver = new Solver();
 
       const result = solver.solve({
         nodes: new Map<string, LocalShape>([
           ["file#/a", { kind: "prim", value: "hello" }],
         ]),
-        nominals: new Map(),
-        incomingNominals: new Map([["file#/a", ["TypeA", "TypeB"]]]),
+        nominals: new Map([["file#/a", ["TypeA", "TypeB"]]]),
       });
 
       expect(result.ok).toBe(false);
@@ -209,15 +207,18 @@ describe("Solver", () => {
       );
     });
 
-    it("incoming nominal conflicts with local nominal", () => {
+    it("multiple nominals from different nodes in same class conflict", () => {
       const solver = new Solver();
 
       const result = solver.solve({
         nodes: new Map<string, LocalShape>([
           ["file#/a", { kind: "prim", value: "hello" }],
+          ["file#/b", { kind: "ref", target: "file#/a" }],
         ]),
-        nominals: new Map([["file#/a", "LocalType"]]),
-        incomingNominals: new Map([["file#/a", ["IncomingType"]]]),
+        nominals: new Map([
+          ["file#/a", ["LocalType"]],
+          ["file#/b", ["IncomingType"]],
+        ]),
       });
 
       expect(result.ok).toBe(false);
@@ -240,25 +241,24 @@ describe("Solver", () => {
         nodes: new Map<string, LocalShape>([
           ["openapi#/response", { kind: "ref", target: "component#/Pet" }],
         ]),
-        nominals: new Map([["openapi#/response", "Pet"]]),
+        nominals: new Map([["openapi#/response", ["Pet"]]]),
       });
 
       const outgoingNominals = openapi.getOutgoingNominals();
       expect(outgoingNominals.get("component#/Pet")).toBe("Pet");
 
-      // Convert to incoming format
-      const incomingNominals = new Map<string, string[]>();
+      // Convert outgoing nominals to input format for downstream solver
+      const downstreamNominals = new Map<string, string[]>();
       for (const [nodeId, nominal] of outgoingNominals) {
-        incomingNominals.set(nodeId, [nominal]);
+        downstreamNominals.set(nodeId, [nominal]);
       }
 
-      // Solve component.yaml with incoming nominals
+      // Solve component.yaml with nominals from upstream
       const component = solver.solve({
         nodes: new Map<string, LocalShape>([
           ["component#/Pet", { kind: "prim", value: "pet-data" }],
         ]),
-        nominals: new Map(),
-        incomingNominals,
+        nominals: downstreamNominals,
       });
 
       expect(component.ok).toBe(true);

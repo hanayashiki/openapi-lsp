@@ -7,7 +7,7 @@
   },
   "rules": {
     "eqeqeq": "warn",
-    "no-console": "off",
+    "no-console": ["error", { "allow": ["warn", "error", "info"] }],
     "no-unused-vars": "warn",
     "import/no-cycle": "error",
     "@typescript-eslint/no-explicit-any": "warn",

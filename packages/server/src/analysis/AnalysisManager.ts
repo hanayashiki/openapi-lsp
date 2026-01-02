@@ -16,7 +16,7 @@ import {
   GroupAnalysisResult,
 } from "./Analysis.js";
 import { parseSpecDocument } from "./analyze.js";
-import { extractFromNode } from "./solver.js";
+import { collectNominalsFromEntryPoint } from "./solver.js";
 import {
   isNodeInDocument,
   uriWithJsonPointerLoose,
@@ -29,6 +29,29 @@ import { md5 } from "js-md5";
 import { fileURLToPath, pathToFileURL } from "url";
 import { openapiFilePatterns } from "@openapi-lsp/core/constants";
 import { DocumentReferenceManager } from "./DocumentReferenceManager.js";
+
+/** Add a single nominal to a Map<NodeId, NominalId[]> */
+function mergeNominal(
+  target: Map<NodeId, NominalId[]>,
+  nodeId: NodeId,
+  nominal: NominalId
+): void {
+  if (!target.has(nodeId)) target.set(nodeId, []);
+  const arr = target.get(nodeId)!;
+  if (!arr.includes(nominal)) arr.push(nominal);
+}
+
+/** Merge all nominals from source into target */
+function mergeNominals(
+  target: Map<NodeId, NominalId[]>,
+  source: Map<NodeId, NominalId[]>
+): void {
+  for (const [nodeId, nominals] of source) {
+    for (const nominal of nominals) {
+      mergeNominal(target, nodeId, nominal);
+    }
+  }
+}
 
 export class AnalysisManager {
   parseResultLoader: CacheLoader<["specDocument.parse", string], ParseResult>;
@@ -127,58 +150,75 @@ export class AnalysisManager {
             nodeId,
             nominal,
           ] of upstream.solveResult.getOutgoingNominals()) {
-            if (!incomingNominals.has(nodeId)) incomingNominals.set(nodeId, []);
-            incomingNominals.get(nodeId)!.push(nominal);
+            mergeNominal(incomingNominals, nodeId, nominal);
           }
         }
 
         // 3. Get member URIs for this group
         const memberUris = dc.analysisGroups.get(groupId) ?? new Set([groupId]);
 
-        // 4. Extract nodes/nominals from each document using unified approach
+        // 4. Phase 1: Collect shapes ONCE per document
         const allNodes = new Map<NodeId, LocalShape>();
-        const allNominals = new Map<NodeId, NominalId>();
 
         for (const uri of memberUris) {
           const doc = await this.documentManager.load(ctx, uri);
           if (doc.type === "tomb") continue;
 
-          // Build incoming nominals for this document
-          const docIncomings = new Map<NodeId, OpenAPITag[]>();
+          // Use YamlDocument.collectLocalShapes() - collects ALL shapes in one pass
+          const shapes = doc.yaml.collectLocalShapes(uri);
+          extendMap(allNodes, shapes);
+        }
 
-          // OpenAPI docs: implicit "Document" nominal at root
+        // 5. Phase 2: Collect nominals per entry point
+        const allNominals = new Map<NodeId, NominalId[]>();
+
+        for (const uri of memberUris) {
+          const doc = await this.documentManager.load(ctx, uri);
+          if (doc.type === "tomb") continue;
+
+          // Build entry points for this document
+          const rootNodeId = uriWithJsonPointerLoose(uri, []);
+          const docEntryPoints = new Map<NodeId, OpenAPITag[]>();
+
+          // Add root entry point
           if (doc.type === "openapi") {
-            const rootNodeId = uriWithJsonPointerLoose(uri, []);
-            docIncomings.set(rootNodeId, ["Document"]);
+            docEntryPoints.set(rootNodeId, ["Document"]);
           }
+          // Component files don't have a known root nominal initially
 
-          // Add external incoming nominals
-          for (const [nodeId, incomings] of incomingNominals) {
+          // Add external incoming nominals as entry points
+          for (const [nodeId, nominals] of incomingNominals) {
             if (isNodeInDocument(nodeId, uri)) {
-              if (!docIncomings.has(nodeId)) docIncomings.set(nodeId, []);
-              docIncomings.get(nodeId)!.push(...(incomings as OpenAPITag[]));
+              if (!docEntryPoints.has(nodeId)) docEntryPoints.set(nodeId, []);
+              docEntryPoints.get(nodeId)!.push(...(nominals as OpenAPITag[]));
             }
           }
 
-          // Extract from each entry point
-          for (const [nodeId, nominals] of docIncomings) {
-            for (const nominal of nominals) {
-              const result = extractFromNode(uri, doc, nodeId, nominal);
+          // Collect nominals from each entry point
+          for (const [entryNodeId, entryNominals] of docEntryPoints) {
+            for (const nominal of entryNominals) {
+              const result = collectNominalsFromEntryPoint(
+                uri,
+                doc,
+                entryNodeId,
+                nominal
+              );
               if (result) {
-                extendMap(allNodes, result.nodes);
-                extendMap(allNominals, result.outgoingNominals);
-                extendMap(allNominals, result.localNominals);
+                mergeNominals(allNominals, result.localNominals);
+                mergeNominals(allNominals, result.outgoingNominals);
               }
             }
           }
         }
 
-        // 5. Run the Solver
+        // 6. Merge incoming nominals into allNominals for solver
+        mergeNominals(allNominals, incomingNominals);
+
+        // 7. Run the Solver with unified nominals
         const solver = new Solver();
         const solveResult = solver.solve({
           nodes: allNodes,
           nominals: allNominals,
-          incomingNominals,
         });
 
         return { groupId, solveResult };
@@ -358,8 +398,10 @@ export class AnalysisManager {
 
   // ----- Debug Helpers -----
   static logAnalysisGroups(dc: DocumentConnectivity): void {
+    // oxlint-disable-next-line
     console.debug("Analysis Groups (SCCs):");
     for (const [groupId, members] of dc.analysisGroups) {
+      // oxlint-disable-next-line
       console.debug(`  ${groupId}: [${[...members].join(", ")}]`);
     }
   }
@@ -420,6 +462,7 @@ export class AnalysisManager {
   }
 
   static logGraphviz(dc: DocumentConnectivity): void {
+    // oxlint-disable-next-line
     console.debug(AnalysisManager.toGraphviz(dc));
   }
 }

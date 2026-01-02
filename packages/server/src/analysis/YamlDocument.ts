@@ -4,11 +4,12 @@ import {
   Range as YamlRange,
   Node,
   Scalar,
-  visit,
+  Pair,
+  YAMLMap,
+  YAMLSeq,
   isScalar,
   isMap,
   isSeq,
-  isPair,
 } from "yaml";
 import { Position, Range } from "vscode-languageserver-textdocument";
 import { DefinitionLink } from "vscode-languageserver";
@@ -26,6 +27,66 @@ export type CollectedRef = {
   keyRange: Range;
   pointerRange: Range;
 };
+
+// ----- Custom YAML Visitor -----
+
+type YamlVisitorCallbacks<T> = {
+  Scalar?: (node: Scalar, path: JsonPointerLoose) => T | undefined;
+  Seq?: (node: YAMLSeq, path: JsonPointerLoose) => T | undefined;
+  Map?: (node: YAMLMap, path: JsonPointerLoose) => T | undefined;
+  Pair?: (
+    pair: Pair,
+    path: JsonPointerLoose,
+    key: string
+  ) => T | undefined;
+};
+
+/**
+ * Custom YAML visitor that efficiently tracks JSON pointer paths (including array indices).
+ * Returns early when a callback returns a non-undefined value.
+ */
+function visitYaml<T>(
+  node: Node | null,
+  path: JsonPointerLoose,
+  callbacks: YamlVisitorCallbacks<T>
+): T | undefined {
+  if (!node) return undefined;
+
+  if (isScalar(node)) {
+    return callbacks.Scalar?.(node, path);
+  }
+
+  if (isSeq(node)) {
+    const seqResult = callbacks.Seq?.(node, path);
+    if (seqResult !== undefined) return seqResult;
+
+    for (let i = 0; i < node.items.length; i++) {
+      const childPath = [...path, i];
+      const result = visitYaml(node.items[i] as Node, childPath, callbacks);
+      if (result !== undefined) return result;
+    }
+  }
+
+  if (isMap(node)) {
+    const mapResult = callbacks.Map?.(node, path);
+    if (mapResult !== undefined) return mapResult;
+
+    for (const pair of node.items) {
+      if (isScalar(pair.key)) {
+        const key = String(pair.key.value);
+        const childPath = [...path, key];
+
+        const pairResult = callbacks.Pair?.(pair, childPath, key);
+        if (pairResult !== undefined) return pairResult;
+
+        const result = visitYaml(pair.value as Node, childPath, callbacks);
+        if (result !== undefined) return result;
+      }
+    }
+  }
+
+  return undefined;
+}
 
 export class YamlDocument {
   constructor(
@@ -48,37 +109,62 @@ export class YamlDocument {
   }
 
   /**
-   * Get the $ref string at the given position, or null if not on a $ref
+   * Get the YAML key at the given position, returning both the key name and its JSON pointer path.
+   * Returns null if position is not on a key.
    */
-  getRefAtPosition(position: Position): { key: string; ref: string } | null {
+  getKeyAtPosition(
+    position: Position
+  ): { key: string; path: JsonPointerLoose } | null {
     const offset = this.getOffsetByTextDocumentPosition(position);
-    let result: { key: string; ref: string } | null = null;
 
-    visit(this.ast, {
-      Map(_key, node, ctx) {
-        if (!node.range) return undefined;
-        const [start, , end] = node.range;
-        if (offset < start || offset > end) return visit.SKIP;
-
-        const refPair = node.items.find(
-          (pair) => isScalar(pair.key) && pair.key.value === "$ref"
-        );
-        if (refPair && isScalar(refPair.value)) {
-          const parent = ctx.at(-1);
-          const ref = String(refPair.value.value);
-
-          if (parent && isPair(parent) && isScalar(parent.key)) {
-            result = {
-              key: String(parent.key.value),
-              ref,
-            };
+    const result = visitYaml(this.ast.contents, [], {
+      Pair: (pair, path, key) => {
+        if (isScalar(pair.key) && pair.key.range) {
+          const [start, , end] = pair.key.range;
+          if (offset >= start && offset <= end) {
+            return { key, path };
           }
         }
         return undefined;
       },
     });
 
-    return result;
+    return result ?? null;
+  }
+
+  /**
+   * Get the $ref string at the given position, or null if not on a $ref
+   */
+  getRefAtPosition(position: Position): { key: string; ref: string } | null {
+    const offset = this.getOffsetByTextDocumentPosition(position);
+
+    return (
+      visitYaml(this.ast.contents, [], {
+        Map: (node, path) => {
+          if (!node.range) return undefined;
+          const [start, , end] = node.range;
+          if (offset < start || offset > end) return undefined;
+
+          const refPair = node.items.find(
+            (pair) => isScalar(pair.key) && pair.key.value === "$ref"
+          );
+          if (refPair && isScalar(refPair.value)) {
+            // Find the nearest string key in the path (skip array indices)
+            let key: string | undefined;
+            for (let i = path.length - 1; i >= 0; i--) {
+              if (typeof path[i] === "string") {
+                key = path[i] as string;
+                break;
+              }
+            }
+            if (key) {
+              return { key, ref: String(refPair.value.value) };
+            }
+          }
+          return undefined;
+        },
+      }) ?? null
+    );
   }
 
   /**
@@ -175,10 +261,10 @@ export class YamlDocument {
   }
 
   collectRefs(): CollectedRef[] {
-    let refs: CollectedRef[] = [];
+    const refs: CollectedRef[] = [];
 
-    visit(this.ast, {
-      Map: (_key, node) => {
+    visitYaml(this.ast.contents, [], {
+      Map: (node) => {
         const refPair = node.items.find(
           (pair) => isScalar(pair.key) && pair.key.value === "$ref"
         );
@@ -189,7 +275,7 @@ export class YamlDocument {
             pointerRange: this.toTextDocumentRange(refPair.value.range!),
           });
         }
-        return undefined;
+        return undefined; // Continue traversal
       },
     });
 

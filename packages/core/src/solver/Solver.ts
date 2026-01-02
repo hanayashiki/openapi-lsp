@@ -14,8 +14,7 @@ import type {
  * Holds mutable state during the solving algorithm.
  */
 class SolveContext {
-  readonly nominals: Map<NodeId, NominalId>;
-  readonly incomingNominals: Map<NodeId, NominalId[]>;
+  readonly nominals: Map<NodeId, NominalId[]>;
 
   nodeToClass: Map<NodeId, ClassId> = new Map();
   classes: Map<ClassId, Class> = new Map();
@@ -26,7 +25,6 @@ class SolveContext {
 
   constructor(input: SolverInput) {
     this.nominals = input.nominals;
-    this.incomingNominals = input.incomingNominals ?? new Map();
   }
 }
 
@@ -91,6 +89,7 @@ class SolveResultImpl implements SolveResult {
 
   private assertNodeExists(node: NodeId): void {
     if (!this.inputNodeIds.has(node)) {
+      console.debug(this.inputNodeIds)
       throw new Error(`Node "${node}" was not in the solver input`);
     }
   }
@@ -198,16 +197,10 @@ export class Solver {
       for (const node of nodeSet) {
         ctx.nodeToClass.set(node, classId);
 
-        // Check local nominals
-        const localNominal = ctx.nominals.get(node);
-        if (localNominal) {
-          tryAssignNominal(node, localNominal);
-        }
-
-        // Check incoming nominals from upstream SCCs
-        const incomingNominals = ctx.incomingNominals.get(node);
-        if (incomingNominals) {
-          for (const nominal of incomingNominals) {
+        // Check all nominals (unified from local tags, refs, and upstream SCCs)
+        const nominals = ctx.nominals.get(node);
+        if (nominals) {
+          for (const nominal of nominals) {
             tryAssignNominal(node, nominal);
           }
         }

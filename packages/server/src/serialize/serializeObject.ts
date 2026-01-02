@@ -1,6 +1,7 @@
 import { OpenAPI } from "@openapi-lsp/core/openapi";
 import type { SerializerContext } from "./types.js";
 import { indent } from "./utils.js";
+// oxlint-disable-next-line no-cycle
 import { serializeSchemaOrRef } from "./serializeSchema.js";
 
 // Serialize object schema

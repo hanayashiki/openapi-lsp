@@ -1,5 +1,9 @@
 import { QueryCache } from "@openapi-lsp/core/queries";
-import { parseUriWithJsonPointer } from "@openapi-lsp/core/json-pointer";
+import {
+  parseUriWithJsonPointer,
+  uriWithJsonPointerLoose,
+  JsonPointerLoose,
+} from "@openapi-lsp/core/json-pointer";
 import { TextDocument } from "vscode-languageserver-textdocument";
 import {
   DefinitionLink,
@@ -17,7 +21,10 @@ import { Workspace } from "./workspace/Workspace.js";
 import { DocumentReferenceManager } from "./analysis/DocumentReferenceManager.js";
 import { AnalysisManager } from "./analysis/AnalysisManager.js";
 import { DocumentConnectivity } from "./analysis/Analysis.js";
-import { serializeToMarkdown } from "./serialize/index.js";
+import {
+  serializeToMarkdown,
+  serializeLiteralToMarkdown,
+} from "./serialize/index.js";
 import { OpenAPITag } from "@openapi-lsp/core/openapi";
 
 export class OpenAPILanguageServer {
@@ -83,75 +90,105 @@ export class OpenAPILanguageServer {
     const spec = await this.documentManager.getServerDocument(uri);
 
     if (spec.type !== "openapi" && spec.type !== "component") {
+      console.error(`[onHover] Not openapi/component: ${spec.type}`);
       return null;
     }
 
-    // Get $ref at position
+    // Determine target: either from $ref or from YAML key position
+    let targetDocUri: string;
+    let targetNodeId: string;
+    let targetPath: JsonPointerLoose;
+    let name: string;
+
     const refResult = spec.yaml.getRefAtPosition(params.position);
-    if (!refResult) {
-      return null;
-    }
-
-    try {
-      // Build target NodeId
+    if (refResult) {
+      // Case 1: Hovering over $ref
       const pointerResult = parseUriWithJsonPointer(refResult.ref, uri);
-
       if (!pointerResult.success) {
+        console.error(`[onHover] Case1: Failed to parse ref: ${refResult.ref}`);
+        return null;
+      }
+      targetDocUri = pointerResult.data.docUri;
+      targetNodeId = pointerResult.data.url.toString();
+      targetPath = pointerResult.data.jsonPointer;
+      name = String(targetPath.at(-1) ?? refResult.key) || "Unknown";
+    } else {
+      // Case 2: Hovering over YAML key
+      const keyResult = spec.yaml.getKeyAtPosition(params.position);
+      if (!keyResult) {
+        console.error(`[onHover] Case2: No key at position`);
         return null;
       }
 
-      const {
-        jsonPointer: targetJsonPointer,
-        url: targetUrl,
-        docUri: targetDocUri,
-      } = pointerResult.data;
-      const targetNodeId = targetUrl.toString();
+      // Check if the value at this key is a $ref object
+      const keyValue = spec.yaml.getValueAtPath(keyResult.path);
+      if (keyValue && typeof keyValue === "object" && "$ref" in keyValue) {
+        // Value is a reference - resolve it like Case 1
+        const pointerResult = parseUriWithJsonPointer(
+          keyValue.$ref as string,
+          uri
+        );
+        if (!pointerResult.success) {
+          console.error(
+            `[onHover] Case2: Failed to parse $ref value: ${keyValue.$ref}`
+          );
+          return null;
+        }
+        targetDocUri = pointerResult.data.docUri;
+        targetNodeId = pointerResult.data.url.toString();
+        targetPath = pointerResult.data.jsonPointer;
+        name = keyResult.key; // Keep the original key name for display
+      } else {
+        // Regular value - use as-is
+        targetDocUri = uri;
+        targetNodeId = uriWithJsonPointerLoose(uri, keyResult.path);
+        targetPath = keyResult.path;
+        name = keyResult.key;
+      }
+    }
 
-      // Get document connectivity
+    // Shared logic: get analysis, nominal, value, and serialize
+    try {
       const dc = await this.analysisManager.documentConnectivityLoader.use([
         "documentConnectivity",
       ]);
-
       if (!dc.graph.has(targetDocUri)) {
+        console.error(
+          `[onHover] targetDocUri not in graph: ${targetDocUri}`
+        );
         return null;
       }
 
-      // Get group analysis for target
       const groupId = DocumentConnectivity.getGroupId(dc, targetDocUri);
       const groupResult = await this.analysisManager.groupAnalysisLoader.use([
         "groupAnalysis",
         groupId,
       ]);
 
-      // Get nominal (type tag like Schema, Response, etc.)
       const nominal = groupResult.solveResult.getCanonicalNominal(
         targetNodeId
       ) as OpenAPITag;
-      if (!nominal) {
-        console.info(
-          `onHover is not available because ${targetNodeId} has no nominal`
+
+      const targetDoc = await this.documentManager.getServerDocument(
+        targetDocUri
+      );
+      if (targetDoc.type === "tomb") {
+        console.error(`[onHover] targetDoc is tomb: ${targetDocUri}`);
+        return null;
+      }
+
+      const value = targetDoc.yaml.getValueAtPath(targetPath);
+      if (value === undefined) {
+        console.error(
+          `[onHover] No value at path: ${JSON.stringify(targetPath)}`
         );
         return null;
       }
 
-      // Extract name from ref
-      const name = (targetJsonPointer.at(-1) ?? refResult.key) || "Unknown";
-
-      // Resolve target document and get the value at path
-      const targetDoc = await this.documentManager.getServerDocument(
-        targetNodeId
-      );
-
-      if (targetDoc.type === "tomb") return null;
-
-      const targetValue = this.getValueAtPath(
-        targetDoc.yaml.ast.toJS(),
-        targetJsonPointer
-      );
-      if (!targetValue) return null;
-
-      // Serialize based on nominal type
-      const markdown = serializeToMarkdown(nominal, targetValue, name);
+      // Serialize: use nominal serializer if available, else literal fallback
+      const markdown = nominal
+        ? serializeToMarkdown(nominal, value, name)
+        : serializeLiteralToMarkdown(value, name);
 
       return {
         contents: {
@@ -159,17 +196,9 @@ export class OpenAPILanguageServer {
           value: markdown,
         },
       };
-    } catch {
+    } catch (e) {
+      console.error(`[onHover] Exception for ${targetNodeId}`, e);
       return null;
     }
-  }
-
-  private getValueAtPath(obj: unknown, path: string[]): unknown {
-    let current: unknown = obj;
-    for (const segment of path) {
-      if (current === null || typeof current !== "object") return undefined;
-      current = (current as Record<string, unknown>)[segment];
-    }
-    return current;
   }
 }

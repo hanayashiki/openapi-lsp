@@ -2,6 +2,7 @@ import {
   OpenAPIInput,
   getReferenceNominal,
   OpenAPITag,
+  getOpenAPITag,
 } from "@openapi-lsp/core/openapi";
 import {
   uriWithJsonPointerLoose,
@@ -9,151 +10,115 @@ import {
   JsonPointerLoose,
   isNodeInDocument,
 } from "@openapi-lsp/core/json-pointer";
-import { LocalShape, NodeId, NominalId } from "@openapi-lsp/core/solver";
-import { visitFragment } from "./Visitor.js";
+import { NodeId, NominalId } from "@openapi-lsp/core/solver";
+import { visitFragment, VisitorFn } from "./Visitor.js";
 import { ServerDocument } from "./ServerDocument.js";
-import { isMap, isScalar, isSeq, Node } from "yaml";
+import { isMap } from "yaml";
+import z from "zod";
 
 // ----- Extractors that gather info for `Solver` -----
 
-export type ExtractionResult = {
-  /** All shapes (prim, array, object, ref) in the traversed subtree */
-  nodes: Map<NodeId, LocalShape>;
+export type NominalCollectionResult = {
   /** Nominals for refs targeting external files */
-  outgoingNominals: Map<NodeId, NominalId>;
-  /** Nominals for refs targeting nodes within the same document */
-  localNominals: Map<NodeId, NominalId>;
+  outgoingNominals: Map<NodeId, NominalId[]>;
+  /** Nominals for refs targeting nodes within the same document + tags from parsing */
+  localNominals: Map<NodeId, NominalId[]>;
 };
 
+// ----- Helper to add nominal to a Map<NodeId, NominalId[]> -----
+
+function addNominal(
+  map: Map<NodeId, NominalId[]>,
+  id: NodeId,
+  nom: NominalId
+): void {
+  if (!map.has(id)) map.set(id, []);
+  const arr = map.get(id)!;
+  if (!arr.includes(nom)) arr.push(nom);
+}
+
 /**
- * Extract shapes and nominals from a document or fragment.
+ * Collect nominals from parsing a document fragment at an entry point.
+ * Called once per (nodeId, nominal) combination.
  *
- * This unified function handles both OpenAPI documents and component fragments:
- * - For OpenAPI documents: call with root nodeId and nominal="Document"
- * - For components: call with the specific nodeId and its expected nominal
- *
- * The function:
- * 1. Collects structural shapes (prim/array/object/ref) from the YAML AST
- * 2. Parses with lenient codec and visits to extract nominals from References
+ * This function handles nominal collection separately from shape collection:
+ * - Shapes are collected once per document via YamlDocument.collectLocalShapes()
+ * - Nominals are collected per entry point via this function
  *
  * @param uri - The document URI
- * @param doc - The server document (openapi or component)
- * @param nodeId - The node ID to extract from (use root for full documents)
- * @param nominal - The nominal type of the node (use "Document" for OpenAPI docs)
- * @returns Shapes and nominals, or undefined if extraction fails
+ * @param doc - The server document
+ * @param nodeId - The entry point node ID
+ * @param nominal - The expected nominal type at the entry point
+ * @returns Nominals discovered, or undefined if parsing fails
  */
-export function extractFromNode(
+export function collectNominalsFromEntryPoint(
   uri: string,
   doc: ServerDocument,
   nodeId: NodeId,
-  nominal: OpenAPITag
-): ExtractionResult | undefined {
+  nominal?: OpenAPITag
+): NominalCollectionResult | undefined {
   if (doc.type === "tomb") {
-    return;
+    return undefined;
   }
 
-  const nodes = new Map<NodeId, LocalShape>();
-  const outgoingNominals = new Map<NodeId, NominalId>();
-  const localNominals = new Map<NodeId, NominalId>();
+  const outgoingNominals = new Map<NodeId, NominalId[]>();
+  const localNominals = new Map<NodeId, NominalId[]>();
 
   // Get the parser for this nominal type
-  const parser = (v: unknown) => OpenAPIInput[nominal].safeParse(v);
+  const parser = (v: unknown) =>
+    nominal ? OpenAPIInput[nominal].safeParse(v) : z.any().parse(v);
 
-  // Extract the JSON pointer from the nodeId
+  // Extract JSON pointer from nodeId
   const parseResult = parseUriWithJsonPointer(nodeId);
   if (!parseResult.success) {
-    return;
+    return undefined;
   }
   const basePath: JsonPointerLoose = parseResult.data.jsonPointer;
 
-  // Navigate to the AST node at this path
+  // Navigate to AST node
   const astNode = doc.yaml.getNodeAtPath(basePath);
   if (!astNode || !isMap(astNode)) {
-    return;
+    return undefined;
   }
 
-  // Get the raw value at this path
+  // Get raw value
   const rawValue = doc.yaml.getValueAtPath(basePath);
   if (!rawValue || typeof rawValue !== "object") {
-    return;
+    return undefined;
   }
 
-  // 1. Collect structural shapes from the AST subtree
-  const collectShapes = (node: Node | null, path: JsonPointerLoose): void => {
-    if (!node) return;
-    const currentNodeId = uriWithJsonPointerLoose(uri, path);
-
-    if (isScalar(node)) {
-      nodes.set(currentNodeId, {
-        kind: "prim",
-        value: node.value as string | number | boolean | null,
-      });
-    } else if (isSeq(node)) {
-      const fields: Record<string, NodeId> = {};
-      for (let i = 0; i < node.items.length; i++) {
-        const childPath = [...path, i];
-        fields[String(i)] = uriWithJsonPointerLoose(uri, childPath);
-        collectShapes(node.items[i] as Node, childPath);
-      }
-      nodes.set(currentNodeId, { kind: "array", fields });
-    } else if (isMap(node)) {
-      // Check for $ref first
-      const refPair = node.items.find(
-        (pair) => isScalar(pair.key) && pair.key.value === "$ref"
-      );
-      if (refPair && isScalar(refPair.value)) {
-        const targetResult = parseUriWithJsonPointer(
-          String(refPair.value.value),
-          uri
-        );
-        if (targetResult.success) {
-          const targetNodeId = targetResult.data.url.toString();
-          nodes.set(currentNodeId, { kind: "ref", target: targetNodeId });
-        }
-      } else {
-        const fields: Record<string, NodeId> = {};
-        for (const pair of node.items) {
-          if (isScalar(pair.key)) {
-            const key = String(pair.key.value);
-            const childPath = [...path, key];
-            fields[key] = uriWithJsonPointerLoose(uri, childPath);
-            collectShapes(pair.value as Node, childPath);
-          }
-        }
-        nodes.set(currentNodeId, { kind: "object", fields });
-      }
-    }
-  };
-
-  collectShapes(astNode, basePath);
-
-  // 2. Parse with lenient codec to get tagged objects
+  // Parse with lenient codec
   const taggedResult = parser(rawValue);
   if (!taggedResult.success) {
     console.error("Failed to parse with input type: ", rawValue);
-    return;
+    return undefined;
   }
 
-  // 3. Visit the parsed fragment to extract nominals from References
-  visitFragment(taggedResult.data, astNode, basePath, {
-    Reference: ({ openapiNode }) => {
-      const targetResult = parseUriWithJsonPointer(openapiNode.$ref, uri);
-      if (!targetResult.success) return;
-      const targetNodeId = targetResult.data.url.toString();
-
-      // Get the nominal this reference expects from its target
-      const refNominal = getReferenceNominal(openapiNode);
-      if (refNominal) {
-        if (!isNodeInDocument(targetNodeId, uri)) {
-          // External ref (different file)
-          outgoingNominals.set(targetNodeId, refNominal);
-        } else {
-          // Local ref (same document)
-          localNominals.set(targetNodeId, refNominal);
+  // Visit to extract nominals from tags and References
+  if (nominal) {
+    visitFragment(taggedResult.data, astNode, basePath, {
+      "*": (({ ast, openapiNode }) => {
+        const tag = getOpenAPITag(openapiNode);
+        if (tag && tag !== "Reference") {
+          addNominal(localNominals, uriWithJsonPointerLoose(uri, ast.path), tag);
         }
-      }
-    },
-  });
+      }) satisfies VisitorFn<object>,
+      Reference: ({ openapiNode }) => {
+        const targetResult = parseUriWithJsonPointer(openapiNode.$ref, uri);
+        if (!targetResult.success) return;
+        const targetNodeId = targetResult.data.url.toString();
 
-  return { nodes, outgoingNominals, localNominals };
+        const refNominal = getReferenceNominal(openapiNode);
+        if (refNominal) {
+          if (!isNodeInDocument(targetNodeId, uri)) {
+            addNominal(outgoingNominals, targetNodeId, refNominal);
+          } else {
+            addNominal(localNominals, targetNodeId, refNominal);
+          }
+        }
+      },
+    });
+  }
+
+  return { outgoingNominals, localNominals };
 }

@@ -1,4 +1,4 @@
-import { getOpenAPITags, OpenAPI } from "@openapi-lsp/core/openapi";
+import { getOpenAPITag, OpenAPI, OpenAPITag } from "@openapi-lsp/core/openapi";
 import {
   Document as YamlDocument,
   Node,
@@ -80,6 +80,8 @@ export interface Visitor {
   Tag?: VisitorFn<OpenAPI.Tag>;
   Info?: VisitorFn<OpenAPI.Info>;
   Document?: VisitorFn<OpenAPI.Document>;
+
+  "*"?: VisitorFn<object>;
 }
 
 interface RecurseContext {
@@ -145,6 +147,12 @@ const _visit = ({
   visitor,
   currentLink,
 }: RecurseContext) => {
+  function getVisitorsForTag(tag: OpenAPITag): VisitorFn<object>[] {
+    return [visitor["*"], visitor[tag]].filter(
+      (v): v is VisitorFn<object> => !!v
+    );
+  }
+
   if (isMap(currentAstNode)) {
     for (const pair of currentAstNode.items) {
       if (!isScalar(pair.key) || !isNode(pair.value)) {
@@ -157,19 +165,18 @@ const _visit = ({
       const nextPath = [...currentPath, key];
 
       if (nextOpenAPINode && typeof nextOpenAPINode === "object") {
-        const tags = getOpenAPITags(nextOpenAPINode);
-        if (tags.length > 0 && isMap(nextAstNode)) {
-          for (const tag of tags) {
-            visitor[tag]?.({
-              openapiNode: nextOpenAPINode as any,
+        const tag = getOpenAPITag(nextOpenAPINode);
+        if (tag && isMap(nextAstNode)) {
+          getVisitorsForTag(tag).forEach((visitor) => {
+            visitor({
+              openapiNode: nextOpenAPINode as never,
               ast: {
                 path: nextPath,
                 astNode: nextAstNode,
-                keyNode: pair.key,
               },
               parent: currentLink,
             });
-          }
+          });
         }
 
         _visit({
@@ -195,19 +202,19 @@ const _visit = ({
       const nextPath = [...currentPath, i];
 
       if (nextOpenAPINode && typeof nextOpenAPINode === "object") {
-        const tags = getOpenAPITags(nextOpenAPINode);
+        const tag = getOpenAPITag(nextOpenAPINode);
 
-        if (tags.length > 0 && isMap(nextAstNode)) {
-          for (const tag of tags) {
-            visitor[tag]?.({
-              openapiNode: nextOpenAPINode as any,
+        if (tag && isMap(nextAstNode)) {
+          getVisitorsForTag(tag).forEach((visitor) => {
+            visitor({
+              openapiNode: nextOpenAPINode as never,
               ast: {
                 path: nextPath,
                 astNode: nextAstNode,
               },
               parent: currentLink,
             });
-          }
+          });
         }
 
         _visit({

@@ -62,13 +62,13 @@ export type Reason =
 export type SolverInput = {
   /** All nodes with their local shapes */
   nodes: Map<NodeId, LocalShape>;
-  /** Nominal anchors mapping nodes to nominal identifiers */
-  nominals: Map<NodeId, NominalId>;
   /**
-   * Pre-resolved nominals from referencing SCCs.
-   * Multiple nominals for the same node will cause NOMINAL_CONFLICT if they differ.
+   * All nominal anchors mapping nodes to nominal identifiers.
+   * Multiple nominals per node are supported (from different sources like
+   * local tags, reference targets, or upstream SCCs).
+   * Conflicts within an equivalence class produce NOMINAL_CONFLICT diagnostic.
    */
-  incomingNominals?: Map<NodeId, NominalId[]>;
+  nominals: Map<NodeId, NominalId[]>;
 };
 
 /**

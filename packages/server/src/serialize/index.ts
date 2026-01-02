@@ -7,3 +7,4 @@ export { serializeContentToMarkdown } from "./serializeContentToMarkdown.js";
 export { serializeMediaTypeToMarkdown } from "./serializeMediaTypeToMarkdown.js";
 export { serializeResponseToMarkdown } from "./serializeResponseToMarkdown.js";
 export { serializeToMarkdown } from "./serializeToMarkdown.js";
+export { serializeLiteralToMarkdown } from "./serializeLiteralToMarkdown.js";
