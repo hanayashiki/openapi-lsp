@@ -124,4 +124,70 @@ describe("nominalPropagation", () => {
       addressResult.solveResult.getCanonicalNominal(addressUri + "#/Address")
     ).toBe("Schema");
   });
+
+  it("should propagate Schema nominal through ring references (A → B → C → A)", async () => {
+    const server = createTestServer({
+      "/workspace/openapi.yaml": {
+        openapi: "3.0.0",
+        info: { title: "Ring Nominal Test", version: "1.0.0" },
+        paths: {
+          "/nodes": {
+            get: {
+              responses: {
+                "200": {
+                  description: "A list of nodes",
+                  content: {
+                    "application/json": {
+                      schema: {
+                        type: "array",
+                        items: { $ref: "./schemas/NodeA.yaml" },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      "/workspace/schemas/NodeA.yaml": {
+        type: "object",
+        properties: {
+          id: { type: "string" },
+          next: { $ref: "./NodeB.yaml" },
+        },
+      },
+      "/workspace/schemas/NodeB.yaml": {
+        type: "object",
+        properties: {
+          id: { type: "string" },
+          next: { $ref: "./NodeC.yaml" },
+        },
+      },
+      "/workspace/schemas/NodeC.yaml": {
+        type: "object",
+        properties: {
+          id: { type: "string" },
+          next: { $ref: "./NodeA.yaml" },
+        },
+      },
+    });
+
+    await server.analysisManager.discoverRoots();
+
+    const nodeAUri = "file:///workspace/schemas/NodeA.yaml";
+    const nodeBUri = "file:///workspace/schemas/NodeB.yaml";
+    const nodeCUri = "file:///workspace/schemas/NodeC.yaml";
+
+    // Get group analysis for the SCC (NodeA is the group ID - alphabetically smallest)
+    const result = await server.analysisManager.groupAnalysisLoader.use([
+      "groupAnalysis",
+      nodeAUri,
+    ]);
+
+    // All three should have canonical nominal "Schema"
+    expect(result.solveResult.getCanonicalNominal(nodeAUri)).toBe("Schema");
+    expect(result.solveResult.getCanonicalNominal(nodeBUri)).toBe("Schema");
+    expect(result.solveResult.getCanonicalNominal(nodeCUri)).toBe("Schema");
+  });
 });

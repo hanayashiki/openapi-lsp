@@ -18,10 +18,7 @@ import {
 } from "./Analysis.js";
 import { parseSpecDocument } from "./analyze.js";
 import { collectNominalsFromEntryPoint } from "./solver.js";
-import {
-  isNodeInDocument,
-  uriWithJsonPointerLoose,
-} from "@openapi-lsp/core/json-pointer";
+import { uriWithJsonPointerLoose } from "@openapi-lsp/core/json-pointer";
 import { extendMap } from "@openapi-lsp/core/collections";
 import { OpenAPITag } from "@openapi-lsp/core/openapi";
 import { Workspace } from "../workspace/Workspace.js";
@@ -52,6 +49,12 @@ function mergeNominals(
       mergeNominal(target, nodeId, nominal);
     }
   }
+}
+
+/** Extract the document URI from a nodeId (e.g., "file:///foo.yaml#/bar" → "file:///foo.yaml") */
+function getUriFromNodeId(nodeId: NodeId): string {
+  const hashIndex = nodeId.indexOf("#");
+  return hashIndex >= 0 ? nodeId.slice(0, hashIndex) : nodeId;
 }
 
 export class AnalysisManager {
@@ -170,54 +173,15 @@ export class AnalysisManager {
           if (doc.type === "tomb") continue;
 
           // Use YamlDocument.collectLocalShapes() - collects ALL shapes in one pass
-          const shapes = doc.yaml.collectLocalShapes(uri);
-          extendMap(allNodes, shapes);
+          extendMap(allNodes, doc.yaml.collectLocalShapes(uri));
         }
 
-        // 5. Phase 2: Collect nominals per entry point
-        const allNominals = new Map<NodeId, NominalId[]>();
-
-        for (const uri of memberUris) {
-          const doc = await this.documentManager.load(ctx, uri);
-          if (doc.type === "tomb") continue;
-
-          // Build entry points for this document
-          const rootNodeId = uriWithJsonPointerLoose(uri, []);
-          const docEntryPoints = new Map<NodeId, OpenAPITag[]>();
-
-          // Add root entry point
-          if (doc.type === "openapi") {
-            docEntryPoints.set(rootNodeId, ["Document"]);
-          }
-          // Component files don't have a known root nominal initially
-
-          // Add external incoming nominals as entry points
-          for (const [nodeId, nominals] of incomingNominals) {
-            if (isNodeInDocument(nodeId, uri)) {
-              if (!docEntryPoints.has(nodeId)) docEntryPoints.set(nodeId, []);
-              docEntryPoints.get(nodeId)!.push(...(nominals as OpenAPITag[]));
-            }
-          }
-
-          // Collect nominals from each entry point
-          for (const [entryNodeId, entryNominals] of docEntryPoints) {
-            for (const nominal of entryNominals) {
-              const result = collectNominalsFromEntryPoint(
-                uri,
-                doc,
-                entryNodeId,
-                nominal
-              );
-              if (result) {
-                mergeNominals(allNominals, result.localNominals);
-                mergeNominals(allNominals, result.outgoingNominals);
-              }
-            }
-          }
-        }
-
-        // 6. Merge incoming nominals into allNominals for solver
-        mergeNominals(allNominals, incomingNominals);
+        // 5. Phase 2: Collect nominals with fixed-point iteration for SCC
+        const allNominals = await this.collectNominalsWithFixedPoint(
+          ctx,
+          memberUris,
+          incomingNominals
+        );
 
         // 7. Run the Solver with unified nominals
         const solver = new Solver();
@@ -244,6 +208,90 @@ export class AnalysisManager {
 
   async discoverRoots(): Promise<DocumentConnectivity> {
     return await this.documentConnectivityLoader.use(["documentConnectivity"]);
+  }
+
+  /**
+   * Collect nominals using fixed-point iteration within an SCC.
+   *
+   * Within an SCC, outgoing nominals from one document should become
+   * entry points for other documents in the same SCC. This requires
+   * iterating until no new entry points are discovered.
+   */
+  private async collectNominalsWithFixedPoint(
+    ctx: CacheComputeContext,
+    memberUris: Set<string>,
+    incomingNominals: Map<NodeId, NominalId[]>
+  ): Promise<Map<NodeId, NominalId[]>> {
+    const allNominals = new Map<NodeId, NominalId[]>();
+
+    // Track which (nodeId, nominal) pairs have been processed as entry points
+    const processedEntryPoints = new Set<string>();
+
+    // Initialize pending entry points from incomingNominals
+    const pendingEntryPoints = new Map<NodeId, NominalId[]>();
+    for (const [nodeId, nominals] of incomingNominals) {
+      for (const nominal of nominals) {
+        mergeNominal(pendingEntryPoints, nodeId, nominal);
+      }
+    }
+
+    // Add root entry points for openapi documents
+    for (const uri of memberUris) {
+      const doc = await this.documentManager.load(ctx, uri);
+      if (doc.type === "openapi") {
+        const rootNodeId = uriWithJsonPointerLoose(uri, []);
+        mergeNominal(pendingEntryPoints, rootNodeId, "Document");
+      }
+    }
+
+    // Fixed-point iteration: process entry points until no new ones are discovered
+    while (pendingEntryPoints.size > 0) {
+      const currentBatch = new Map(pendingEntryPoints);
+      pendingEntryPoints.clear();
+
+      for (const [entryNodeId, entryNominals] of currentBatch) {
+        const entryUri = getUriFromNodeId(entryNodeId);
+        if (!memberUris.has(entryUri)) continue;
+
+        const doc = await this.documentManager.load(ctx, entryUri);
+        if (doc.type === "tomb") continue;
+
+        for (const nominal of entryNominals) {
+          const key = `${entryNodeId}\0${nominal}`;
+          if (processedEntryPoints.has(key)) continue;
+          processedEntryPoints.add(key);
+
+          const result = collectNominalsFromEntryPoint(
+            entryUri,
+            doc,
+            entryNodeId,
+            nominal as OpenAPITag
+          );
+          if (result) {
+            mergeNominals(allNominals, result.localNominals);
+            mergeNominals(allNominals, result.outgoingNominals);
+
+            // Add outgoing nominals that target within-SCC nodes as new entry points
+            for (const [targetNodeId, targetNominals] of result.outgoingNominals) {
+              const targetUri = getUriFromNodeId(targetNodeId);
+              if (memberUris.has(targetUri)) {
+                for (const nom of targetNominals) {
+                  const targetKey = `${targetNodeId}\0${nom}`;
+                  if (!processedEntryPoints.has(targetKey)) {
+                    mergeNominal(pendingEntryPoints, targetNodeId, nom);
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // Merge incoming nominals into allNominals for solver
+    mergeNominals(allNominals, incomingNominals);
+
+    return allNominals;
   }
 
   // ----- analytic algoritms -----
