@@ -1,6 +1,7 @@
 import {
   CacheComputeContext,
   CacheLoader,
+  LoaderResult,
   QueryCache,
 } from "@openapi-lsp/core/queries";
 import {
@@ -72,19 +73,22 @@ export class AnalysisManager {
     cache: QueryCache
   ) {
     this.parseResultLoader = cache.createLoader(
-      async ([_, uri], ctx): Promise<ParseResult> => {
+      async ([_, uri], ctx): Promise<LoaderResult<ParseResult>> => {
         const spec = await this.documentManager.load(ctx, uri);
 
         if (spec.type !== "openapi") {
           throw new Error(`Cannot analyze non-openapi document: ${spec.type}`);
         }
 
-        return parseSpecDocument(spec);
+        const value = await parseSpecDocument(spec);
+        // Hash based on the YAML AST content
+        const hash = spec.yaml.getHash();
+        return { value, hash };
       }
     );
 
     this.documentConnectivityLoader = cache.createLoader(
-      async ([_], ctx): Promise<DocumentConnectivity> => {
+      async ([_], ctx): Promise<LoaderResult<DocumentConnectivity>> => {
         const dc = DocumentConnectivity.createDefault();
 
         // Discover all roots from all workspace folders
@@ -122,12 +126,13 @@ export class AnalysisManager {
         // Compute SCCs using Kosaraju's algorithm
         this.computeAnalysisGroups(dc);
 
-        return dc;
+        const hash = AnalysisManager.getConnectivityHash(dc);
+        return { value: dc, hash };
       }
     );
 
     this.groupAnalysisLoader = cache.createLoader(
-      async ([_, groupId], ctx): Promise<GroupAnalysisResult> => {
+      async ([_, groupId], ctx): Promise<LoaderResult<GroupAnalysisResult>> => {
         // 1. Load document connectivity
         // FIXME: retrieve upstreams from context, since `documentConnectivity` is updated on every change!
         const dc = await this.documentConnectivityLoader.load(ctx, [
@@ -221,7 +226,10 @@ export class AnalysisManager {
           nominals: allNominals,
         });
 
-        return { groupId, solveResult };
+        const value = { groupId, solveResult };
+        // Hash based on the solver result's serialized nominals
+        const hash = solveResult.getHash();
+        return { value, hash };
       }
     );
   }

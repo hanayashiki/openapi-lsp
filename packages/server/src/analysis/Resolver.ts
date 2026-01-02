@@ -7,6 +7,7 @@ import { err, ok } from "@openapi-lsp/core/result";
 import {
   CacheComputeContext,
   CacheLoader,
+  LoaderResult,
   QueryCache,
 } from "@openapi-lsp/core/queries";
 import { parseUriWithJsonPointer } from "@openapi-lsp/core/json-pointer";
@@ -19,27 +20,36 @@ export class Resolver {
     cache: QueryCache
   ) {
     this.loader = cache.createLoader(
-      async ([_, input], ctx): Promise<ModuleResolutionResult> => {
+      async ([_, input], ctx): Promise<LoaderResult<ModuleResolutionResult>> => {
         // Use parseUriWithJsonPointer for resolution - handles ../ correctly
         const parseResult = parseUriWithJsonPointer(input.ref, input.baseUri);
         if (!parseResult.success) {
-          return err({ type: "invalidUri" });
+          return { value: err({ type: "invalidUri" }), hash: "" };
         }
 
         const resolvedUrl = parseResult.data.url;
 
         if (resolvedUrl.protocol !== "file:") {
-          return err({
-            type: "unsupportedUriScheme",
-            scheme: resolvedUrl.protocol.replace(/:$/, ""),
-          });
+          return {
+            value: err({
+              type: "unsupportedUriScheme",
+              scheme: resolvedUrl.protocol.replace(/:$/, ""),
+            }),
+            hash: "",
+          };
         }
 
         // Use docUri which has fragment stripped
         const resolvedUri = parseResult.data.docUri;
 
         // Use documentManager.load for proper dependency tracking
-        return ok(await this.documentManager.load(ctx, resolvedUri));
+        const doc = await this.documentManager.load(ctx, resolvedUri);
+        // Hash based on the resolved document's hash (if it has one)
+        const hash =
+          doc.type === "openapi" || doc.type === "component"
+            ? doc.yaml.getHash()
+            : "";
+        return { value: ok(doc), hash };
       }
     );
   }

@@ -1,6 +1,7 @@
 import {
   CacheComputeContext,
   CacheLoader,
+  LoaderResult,
   QueryCache,
 } from "@openapi-lsp/core/queries";
 import { Resolver } from "./Resolver.js";
@@ -26,13 +27,13 @@ export class DocumentReferenceManager {
     cache: QueryCache
   ) {
     this.loader = cache.createLoader(
-      async ([_, uri], ctx): Promise<DocumentReferences> => {
+      async ([_, uri], ctx): Promise<LoaderResult<DocumentReferences>> => {
         const document = await this.documentManager.load(ctx, uri);
 
         if (document.type === "openapi" || document.type === "component") {
           const yamlRefs = document.yaml.collectRefs();
 
-          return {
+          const value: DocumentReferences = {
             uri,
             references: await Promise.all(
               yamlRefs.map(
@@ -56,10 +57,13 @@ export class DocumentReferenceManager {
               )
             ),
           };
+          // Hash based on document content
+          const hash = document.yaml.getHash();
+          return { value, hash };
         } else {
           return {
-            uri,
-            references: [],
+            value: { uri, references: [] },
+            hash: "",
           };
         }
       }

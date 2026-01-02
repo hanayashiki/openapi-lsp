@@ -1,4 +1,5 @@
 import { UnionFind } from "./union-find.js";
+import { md5 } from "js-md5";
 import type {
   NodeId,
   NominalId,
@@ -85,6 +86,29 @@ class SolveResultImpl implements SolveResult {
 
   getOutgoingNominals(): Map<NodeId, NominalId> {
     return new Map(this.outgoingNominalsMap);
+  }
+
+  getHash(): string {
+    // Hash based on nodeId → nominal mapping (what downstream consumers need)
+    const hash = md5.create();
+
+    // Build nodeId → nominal map from nodeToClass → classes
+    const nodeNominals: [NodeId, NominalId | null][] = [];
+    for (const [nodeId, classId] of this.nodeToClass) {
+      const cls = this.classes.get(classId);
+      nodeNominals.push([nodeId, cls?.nominal ?? null]);
+    }
+
+    // Sort for deterministic hashing
+    nodeNominals.sort(([a], [b]) => a.localeCompare(b));
+
+    for (const [nodeId, nominal] of nodeNominals) {
+      hash.update(nodeId);
+      hash.update("\0");
+      hash.update(nominal ?? "");
+      hash.update("\n");
+    }
+    return hash.hex();
   }
 
   private assertNodeExists(node: NodeId): void {

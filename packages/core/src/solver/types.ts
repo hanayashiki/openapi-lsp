@@ -83,6 +83,7 @@ export interface SolveResult {
 
   /**
    * Get the equivalence class ID for a node.
+   * @internal For testing purposes only
    * @throws Error if the node was not in the input
    */
   getClassId(node: NodeId): ClassId;
@@ -99,4 +100,9 @@ export interface SolveResult {
    * These are the nominals this SCC expects from referenced SCCs.
    */
   getOutgoingNominals(): Map<NodeId, NominalId>;
+
+  /**
+   * Get a hash representing the solve result for cache invalidation.
+   */
+  getHash(): string;
 }

@@ -13,6 +13,7 @@ import {
 } from "yaml";
 import { Position, Range } from "vscode-languageserver-textdocument";
 import { DefinitionLink } from "vscode-languageserver";
+import { md5 } from "js-md5";
 import {
   parseJsonPointer,
   parseUriWithJsonPointer,
@@ -337,5 +338,14 @@ export class YamlDocument {
 
     visitNode(this.ast.contents, []);
     return shapes;
+  }
+
+  /**
+   * Get a hash of the YAML AST content.
+   * Uses toJSON() which works even when the document has errors.
+   */
+  getHash(): string {
+    const content = JSON.stringify(this.ast.toJSON());
+    return md5(content);
   }
 }

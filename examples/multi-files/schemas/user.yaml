@@ -31,4 +31,4 @@ CreateUserRequest:
     name:
       type: string
     address:
-      $ref: "./address.yaml#/Address"
+      $ref: "./address.yaml#/Address"  

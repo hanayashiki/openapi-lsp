@@ -34,6 +34,19 @@ export class NodeVFS implements VFS {
     }
   }
 
+  async writeFile(filePath: string, content: string): Promise<Result<void, VFSError>> {
+    if (!this.isInsideWorkspace(filePath)) {
+      return err({ type: "outsideWorkspace", path: filePath });
+    }
+
+    try {
+      await fs.writeFile(filePath, content, "utf-8");
+      return ok(undefined);
+    } catch (error) {
+      return err(this.mapError(filePath, error));
+    }
+  }
+
   async glob(
     pattern: string | string[],
     options: GlobOptions

@@ -13,6 +13,10 @@ export const ExtensionConfiguration = z.object({
       `The minimatch (https://www.npmjs.com/package/minimatch) glob pattern to ignore during OpenAPI document discovery`
     )
     .default("{**/node_modules/**,**/.git/**,**/.hg/**}"),
+  "openapi-lsp.debug.cache": z
+    .boolean()
+    .describe(`Enable debug logging for cache invalidation and recomputation`)
+    .default(false),
 });
 
 export type ExtensionConfiguration = z.infer<typeof ExtensionConfiguration>;

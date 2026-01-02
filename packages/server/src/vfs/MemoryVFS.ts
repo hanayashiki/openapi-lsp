@@ -21,6 +21,11 @@ export class MemoryVFS implements VFS {
     return ok(content);
   }
 
+  async writeFile(path: string, content: string): Promise<Result<void, VFSError>> {
+    this.files.set(path, content);
+    return ok(undefined);
+  }
+
   async glob(
     pattern: string | string[],
     options: GlobOptions

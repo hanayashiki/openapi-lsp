@@ -1,6 +1,7 @@
 import {
   CacheComputeContext,
   CacheLoader,
+  LoaderResult,
   QueryCache,
 } from "@openapi-lsp/core/queries";
 import { fileURLToPath } from "node:url";
@@ -23,31 +24,31 @@ export class ServerDocumentManager {
     private vfs: VFS
   ) {
     this.loader = cache.createLoader(
-      async ([_, uri]): Promise<ServerDocument> => {
+      async ([_, uri]): Promise<LoaderResult<ServerDocument>> => {
         const textResult = await this.readContent(uri);
 
         if (textResult.success) {
           const lineCounter = new LineCounter();
           const ast = parseDocument(textResult.data, { lineCounter });
           const filename = path.basename(fileURLToPath(uri));
+          const yaml = new YamlDocument(ast, lineCounter);
+          const hash = yaml.getHash();
 
           if (isOpenapiFile(filename)) {
             return {
-              type: "openapi",
-              uri,
-              yaml: new YamlDocument(ast, lineCounter),
+              value: { type: "openapi", uri, yaml },
+              hash,
             };
           } else if (isComponentFile(filename)) {
             return {
-              type: "component",
-              uri,
-              yaml: new YamlDocument(ast, lineCounter),
+              value: { type: "component", uri, yaml },
+              hash,
             };
           } else {
-            return { type: "tomb", uri };
+            return { value: { type: "tomb", uri }, hash: "" };
           }
         } else {
-          return { type: "tomb", uri };
+          return { value: { type: "tomb", uri }, hash: "" };
         }
       }
     );

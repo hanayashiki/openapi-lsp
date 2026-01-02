@@ -1,3 +1,4 @@
 {
-    "openapi-lsp.discoverRoots.ignore": "{**/node_modules/**,**/.git/**,**/.hg/**}"
+  "openapi-lsp.discoverRoots.ignore": "{**/node_modules/**,**/.git/**,**/.hg/**}",
+  "openapi-lsp.debug.cache": true
 }

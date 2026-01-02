@@ -39,7 +39,9 @@ export class OpenAPILanguageServer {
     private documents: TextDocuments<TextDocument>,
     private vfs: VFS
   ) {
-    this.cache = new QueryCache();
+    this.cache = new QueryCache(
+      this.workspace.configuration["openapi-lsp.debug.cache"]
+    );
     this.documentManager = new ServerDocumentManager(
       this.documents,
       this.cache,

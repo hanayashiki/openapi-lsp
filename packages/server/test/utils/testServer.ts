@@ -21,6 +21,11 @@ function createMockTextDocuments(): TextDocuments<TextDocument> {
   } as unknown as TextDocuments<TextDocument>;
 }
 
+export type TestServer = {
+  server: OpenAPILanguageServer;
+  vfs: MemoryVFS;
+};
+
 /**
  * Create a test server with files specified as JSON objects.
  * Objects are automatically serialized to YAML.
@@ -29,6 +34,17 @@ export function createTestServer(
   files: Record<string, object>,
   workspaceUri = "file:///workspace"
 ): OpenAPILanguageServer {
+  return createTestServerWithVFS(files, workspaceUri).server;
+}
+
+/**
+ * Create a test server with files specified as JSON objects.
+ * Returns both the server and VFS for file manipulation during tests.
+ */
+export function createTestServerWithVFS(
+  files: Record<string, object>,
+  workspaceUri = "file:///workspace"
+): TestServer {
   // Serialize all file contents to YAML
   const yamlFiles: Record<string, string> = {};
   for (const [path, content] of Object.entries(files)) {
@@ -40,5 +56,8 @@ export function createTestServer(
     configuration: ExtensionConfiguration.parse({}),
     workspaceFolders: [{ uri: workspaceUri, name: "test-workspace" }],
   };
-  return new OpenAPILanguageServer(workspace, createMockTextDocuments(), vfs);
+  return {
+    server: new OpenAPILanguageServer(workspace, createMockTextDocuments(), vfs),
+    vfs,
+  };
 }

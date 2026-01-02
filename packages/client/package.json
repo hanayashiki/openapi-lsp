@@ -65,6 +65,11 @@
           "type": "string",
           "default": "{**/node_modules/**,**/.git/**,**/.hg/**}",
           "description": "The minimatch (https://www.npmjs.com/package/minimatch) glob pattern to ignore during OpenAPI document discovery"
+        },
+        "openapi-lsp.debug.cache": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable debug logging for cache invalidation and recomputation"
         }
       }
     }
