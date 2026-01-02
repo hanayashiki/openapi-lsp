@@ -1,14 +1,15 @@
-# OpenAPI 文档自身类型 Solver（Algorithm-only）设计
+# OpenAPI Document Structure Type Solver
 
-> 目标：
-> 对 **拆分的 OpenAPI JSON/YAML 文档节点** 求解其 **文档自身的结构类型**（JSON shape），
-> 支持 `$ref` 等价传播、递归、名义（nominal）命名与冲突处理。
-> ❌ 不求解 OpenAPI schema 语义类型（string/object 等 API 含义）
-> ❌ 不做增量缓存（由上层处理）
+> **Goal:**
+> Solve the **document's own structural types** (JSON shape) for split OpenAPI JSON/YAML document nodes.
+> Supports `$ref` equivalence propagation, recursion, nominal naming, and conflict detection.
+> - Does NOT solve OpenAPI schema semantic types (string/object API meanings)
+> - Does NOT handle incremental caching (handled by upper layers)
+> - Supports incremental analysis via SCC (Strongly Connected Components) ordering
 
 ---
 
-## 1. 基本建模
+## 1. Core Types
 
 ### 1.1 Node
 
@@ -17,203 +18,314 @@
 type NodeId = string;
 ```
 
-表示文档中的一个 JSON 节点。
+Represents a JSON node in the document. Examples:
+- `file:///workspace/openapi.yaml#/components/schemas/Pet`
+- `file:///workspace/schemas/User.yaml#/properties/name`
 
 ---
 
-### 1.2 文档自身类型（JSON Shape）
+### 1.2 Document Structure Type (JSON Shape)
 
 ```ts
 type JSONType =
   | { kind: "prim"; prim: "null" | "bool" | "number" | "string" }
   | { kind: "array"; elem: JSONType }
-  | {
-      kind: "object";
-      fields: Record<string, JSONType>;
-    }
-  | { kind: "typevar"; } // 未推出类型的节点，例如孤立 $ref 环
-  | { kind: "nominal"; id: NominalId }; // 仅用于输出/引用层
+  | { kind: "object"; fields: Record<string, JSONType> }
+  | { kind: "typevar" };  // Unresolved type (e.g., isolated $ref cycle)
 ```
 
-> 说明
->
-> * `nominal` **不参与求解**，仅用于命名/导出
-> * `required` 在等价语义下必须保持一致，不允许通过 merge 推导 optional
+> Note: `typevar` represents unresolved types in cyclic references.
+> Nominals are tracked separately via the `nominals` map, not as a JSONType variant.
 
 ---
 
-### 1.3 名义锚点（Nominal）
+### 1.3 Local Shape (Solver Input)
 
-```ts
-type NominalId = string;
-```
-
-* 只是"给某个节点/等价类起名字"
-* 多个 nominal 冲突时直接报错
-
----
-
-### 1.4 局部形状事实（LocalShape）
-
-Solver 的输入是"事实"，其实是 JSON Literal + ref 扩展。
+The solver's input consists of "facts" - JSON literals with $ref extensions.
+Each JSON path has its own node; composite types reference children by NodeId.
 
 ```ts
 type LocalShape =
-  | { kind: "prim"; value: string | null | bool | number }
-  | { kind: "ref"; id: NodeId }
-  | { kind: "array"; elems: ValueRef[] }
-  | { kind: "object"; fields: Record<string, LocalShape> }
+  | { kind: "prim"; value: string | null | boolean | number }
+  | { kind: "ref"; target: NodeId }
+  | { kind: "array"; fields: Record<string, NodeId> }   // keys are stringified indices
+  | { kind: "object"; fields: Record<string, NodeId> }; // keys are field names
 ```
 
-说明：
-
-* `ref` 表示 `$ref`，语义是 **完全等价（identity / substitution）**
+> Notes:
+> - `ref` represents `$ref` with **identity/substitution semantics**
+> - Arrays and objects both use `fields: Record<string, NodeId>` - the `kind` tag differentiates them
 
 ---
 
-### 1.5 等价类（Equivalence Class）
+### 1.4 Equivalence Class
 
-`$ref` 产生等价关系，所有通过 `$ref` 连接的节点属于同一个等价类。
+`$ref` creates equivalence relations. All nodes connected via `$ref` belong to the same class.
 
 ```ts
 type ClassId = number;
 
 type Class = {
   id: ClassId;
-  nodes: Set<NodeId>; // 等价类中的所有节点
-  nominal: NominalId | null; // 该等价类的 nominal（如果有，最多一个）
-};
-```
-
-| 字段        | 用途                        |
-| --------- | ------------------------- |
-| `id`      | 等价类编号，可作为数组索引             |
-| `nodes`   | 所有通过 `$ref` 等价的节点         |
-| `nominal` | 每个等价类最多一个 nominal，多个则冲突报错 |
-
----
-
-### 1.6 Solver 内部状态
-
-```ts
-type SolverState = {
-  nodes: Map<NodeId, LocalShape>; // 所有节点的局部形状
-  nodeToClass: Map<NodeId, ClassId>; // 节点 → 等价类 映射
-  classes: Map<ClassId, Class>; // 所有等价类
-  nominalToClass: Map<NominalId, ClassId>; // nominal → 等价类 映射
+  nodes: Set<NodeId>;       // All nodes in this equivalence class
+  nominal: NominalId | null; // At most one nominal per class
 };
 ```
 
 ---
 
-## 2. 求解语义核心
+## 2. Nominals
 
-### 2.1 等价语义（唯一语义）
-
-* `$ref` 表示 **完全等价（identity）**
-* 同一等价类内的节点 **必须具有完全一致的 JSON 结构类型**
-* 不存在 subtype、上下界或方向性传播
-
----
-
-### 2.2 等价类内的一致性检查（unify）
-
-* 忽略所有 `ref` 形状
-* 收集所有 **非-ref 的 concrete shapes**
-* 规则：
-
-  * 若 concrete shape 数量为 0 → 类型为 `typevar`
-  * 若数量为 1 → 类型即该 shape 的结构类型
-  * 若数量 ≥ 2 → 必须结构一致，否则报错
-
-**一致性要求：**
-
-* `prim`：必须同一 primitive
-* `array`：元素类型（经等价类折叠）必须一致
-* `object`：
-  * 字段集合必须完全一致
-  * `ref` 节点（经等价类折叠）必须一致
-  * 宽容节点的顺序
-* 任意不兼容情况 → `STRUCT_CONFLICT`
-
----
-
-### 2.3 等价类的作用
-
-* `$ref` 图可能有递归
-* **先构建等价类**，把所有 `$ref` 连接的节点视为同一个语义实体
-* 求解只在等价类内部进行
-* 等价类之间 **不存在任何类型关系**
-
----
-
-### 2.4 求解算法（两阶段）
-
-```
-solve():
-  // Phase 1: 构建等价类（Union-Find）
-  for each node A with LocalShape.ref(target=B):
-    union(A, B)
-
-  // Phase 2: 对每个等价类做一致性检查
-  for each class C:
-    shapes = all non-ref LocalShape in C.nodes
-    if shapes.size == 0:
-      type[C] = unknown
-    else:
-      type[C] = unify_all(shapes)  // 不一致则报错
-```
-
-说明：
-
-* 不存在拓扑排序
-* 不存在迭代
-* 不存在 subtype 检查
-
----
-
-## 3. 冲突处理
-
-所有冲突直接报错：
-
-* **Nominal 冲突**：同一等价类内有多个不同 nominal → 报错
-* **结构冲突**：等价类内多个 concrete shape 不一致 → 报错
-* **缺失目标**：`$ref` 指向不存在节点 → 报错
-
----
-
-## 4. Solver API（Algorithm-only）
+### 2.1 What are Nominals?
 
 ```ts
-interface Solver {
-  // --- 构建 ---
-  addNode(id: NodeId, shape: LocalShape): void;
-  setNominalAnchor(node: NodeId, nominal: NominalId): void;
+type NominalId = string;  // e.g., "Schema", "Response", "Parameter"
+```
 
-  // --- 求解 ---
-  solve(): SolveResult;
+Nominals are **named type anchors** that identify the semantic role of a node within the OpenAPI structure. They answer the question: "What kind of OpenAPI component is this node?"
 
-  // --- 查询 ---
-  getType(node: NodeId): JSONType | undefined;
-  getClassId(node: NodeId): ClassId | undefined;
-  getCanonicalNominal(node: NodeId): NominalId | undefined;
+Examples:
+- A node at `#/components/schemas/Pet` gets nominal `"Schema"`
+- A node at `#/components/responses/Error` gets nominal `"Response"`
+- A node at `#/paths/~1users/get/parameters/0` gets nominal `"Parameter"`
+
+### 2.2 Why Nominals Matter
+
+**Problem:** External YAML files don't know their semantic context.
+
+Consider this structure:
+```yaml
+# openapi.yaml
+components:
+  schemas:
+    Pet:
+      $ref: "./schemas/Pet.yaml"  # External file
+
+# schemas/Pet.yaml
+type: object
+properties:
+  name: { type: string }
+```
+
+The file `Pet.yaml` has no idea it's being used as a Schema. It could equally be a Response or RequestBody. Nominals solve this by propagating the semantic context.
+
+### 2.3 Nominal Propagation Flow
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  openapi.yaml (SCC 1)                                       │
+│    components/schemas/Pet → nominal: "Schema"               │
+│    $ref: "./schemas/Pet.yaml"                               │
+│                         ↓                                   │
+│              outgoingNominals: { Pet.yaml → "Schema" }      │
+└─────────────────────────────────────────────────────────────┘
+                          ↓
+┌─────────────────────────────────────────────────────────────┐
+│  Pet.yaml (SCC 2)                                           │
+│    incomingNominals: { Pet.yaml → ["Schema"] }              │
+│                         ↓                                   │
+│    Root node receives nominal "Schema"                      │
+│    Structural propagation → nested nodes also get "Schema"  │
+└─────────────────────────────────────────────────────────────┘
+```
+
+1. **Assignment:** OpenAPI document assigns nominals based on structural position
+2. **Export:** Solver exports nominals for external refs via `getOutgoingNominals()`
+3. **Import:** Downstream SCCs receive these as `incomingNominals`
+4. **Propagation:** Component files propagate nominals through their structure
+
+### 2.4 Nominal Conflicts
+
+The same equivalence class cannot have multiple different nominals.
+
+```yaml
+# Conflict example:
+components:
+  schemas:
+    Pet:
+      $ref: "#/components/responses/Pet"  # Same target...
+  responses:
+    Pet:
+      description: "A pet"  # ...but different nominals!
+```
+
+This produces a `NOMINAL_CONFLICT` diagnostic because `Pet` cannot be both a "Schema" and a "Response".
+
+---
+
+## 3. Solver Algorithm
+
+The solver operates in two phases:
+
+### Phase 1: Build Equivalence Classes
+
+```
+buildEquivalenceClasses():
+  uf = new UnionFind()
+
+  // Initialize all input nodes
+  for each node in input.nodes:
+    uf.makeSet(node)
+
+  // Union $ref nodes with their targets
+  for each (node, shape) in input.nodes:
+    if shape.kind == "ref":
+      target = shape.target
+      if target not in input.nodes:
+        externalNodes.add(target)  // Track external dependency
+        uf.makeSet(target)
+      uf.union(node, target)
+
+  // Extract components and assign class IDs
+  for each component in uf.getComponents():
+    classId = nextId++
+    class = { id: classId, nodes: component, nominal: null }
+
+    // Assign nominals from both local and incoming, detect conflicts
+    for each node in component:
+      // Check local nominals (from input.nominals)
+      if node has local nominal:
+        tryAssignNominal(class, node, nominal)
+
+      // Check incoming nominals (from upstream SCCs)
+      for each incoming nominal for node:
+        tryAssignNominal(class, node, nominal)
+
+  tryAssignNominal(class, node, nominal):
+    if class.nominal is null:
+      class.nominal = nominal
+    else if class.nominal != nominal:
+      emit NOMINAL_CONFLICT diagnostic
+```
+
+### Phase 2: Compute Types
+
+```
+computeTypes():
+  pendingClasses = all class IDs
+
+  // Iterative processing (leaves first)
+  while pendingClasses is not empty and making progress:
+    for each classId in pendingClasses:
+      if all dependencies resolved:
+        type = unifyClass(classId)
+        if type is not null:
+          classTypes.set(classId, type)
+          pendingClasses.remove(classId)
+
+  // Remaining classes get typevar (cycles)
+  for each classId in pendingClasses:
+    classTypes.set(classId, { kind: "typevar" })
+
+unifyClass(class):
+  // Collect incoming types and concrete shapes
+  unifiedType = { kind: "typevar" }
+
+  for each incoming type:
+    unifiedType = unify(unifiedType, type)
+    if unifiedType is null:
+      emit STRUCT_CONFLICT diagnostic
+      return null
+
+  for each non-ref shape in class:
+    shapeType = shapeToType(shape)
+    unifiedType = unify(unifiedType, shapeType)
+    if unifiedType is null:
+      emit STRUCT_CONFLICT diagnostic
+      return null
+
+  return unifiedType
+```
+
+---
+
+## 4. SCC Integration
+
+Documents form a dependency graph via `$ref`. The upper layer uses Kosaraju's algorithm to compute Strongly Connected Components (SCCs), which are then analyzed in topological order.
+
+### Why SCCs?
+
+- Circular references within an SCC are handled together
+- Linear dependencies between SCCs enable incremental analysis
+- Each SCC is solved independently with inputs from upstream SCCs
+
+### Data Flow Between SCCs
+
+```
+┌──────────────────┐     ┌──────────────────┐     ┌──────────────────┐
+│   SCC 1 (root)   │────▶│   SCC 2 (middle) │────▶│   SCC 3 (leaf)   │
+│                  │     │                  │     │                  │
+│ outgoingTypes    │     │ incomingTypes    │     │ incomingTypes    │
+│ outgoingNominals │     │ incomingNominals │     │ incomingNominals │
+│                  │     │ outgoingTypes    │     │                  │
+│                  │     │ outgoingNominals │     │                  │
+└──────────────────┘     └──────────────────┘     └──────────────────┘
+```
+
+---
+
+## 5. API Reference
+
+### 5.1 Solver
+
+```ts
+class Solver {
+  /**
+   * Solve the type system: build equivalence classes and unify types.
+   * Stateless - all input provided upfront, all output via SolveResult.
+   */
+  solve(input: SolverInput): SolveResult;
+}
+```
+
+### 5.2 SolverInput
+
+```ts
+type SolverInput = {
+  /** All nodes with their local shapes */
+  nodes: Map<NodeId, LocalShape>;
+
+  /** Nominal anchors mapping nodes to nominal identifiers */
+  nominals: Map<NodeId, NominalId>;
+
+  /** Pre-resolved types from upstream SCCs (optional) */
+  incomingTypes?: Map<NodeId, JSONType[]>;
+
+  /** Pre-resolved nominals from upstream SCCs (optional) */
+  incomingNominals?: Map<NodeId, NominalId[]>;
+};
+```
+
+### 5.3 SolveResult
+
+```ts
+interface SolveResult {
+  /** Whether solving completed without errors */
+  readonly ok: boolean;
+
+  /** All diagnostics produced during solving */
+  readonly diagnostics: readonly Diagnostic[];
+
+  /** Get the resolved type for a node */
+  getType(node: NodeId): JSONType;
+
+  /** Get the equivalence class ID for a node */
+  getClassId(node: NodeId): ClassId;
+
+  /** Get the canonical nominal for a node's equivalence class */
+  getCanonicalNominal(node: NodeId): NominalId | null;
+
+  /** Get types for external refs (for downstream SCCs) */
+  getOutgoingTypes(): Map<NodeId, JSONType>;
+
+  /** Get nominals for external refs (for downstream SCCs) */
+  getOutgoingNominals(): Map<NodeId, NominalId>;
 }
 ```
 
 ---
 
-### 4.1 SolveResult
-
-```ts
-type SolveResult = {
-  ok: boolean;
-  diagnostics: Diagnostic[];
-};
-```
-
----
-
-### 4.2 Diagnostic（错误可解释性）
+## 6. Diagnostics
 
 ```ts
 type Diagnostic =
@@ -221,23 +333,16 @@ type Diagnostic =
       code: "NOMINAL_CONFLICT";
       a: NominalId;
       b: NominalId;
-      proofA: Reason[];
-      proofB: Reason[];
+      proofA: Reason[];  // Path showing how 'a' was assigned
+      proofB: Reason[];  // Path showing how 'b' was assigned
     }
   | {
       code: "STRUCT_CONFLICT";
       node: NodeId;
-      left: JSONType;
-      right: JSONType;
-    }
-  | {
-      code: "MISSING_TARGET";
-      from: NodeId;
-      to: NodeId;
+      left: JSONType;   // First type
+      right: JSONType;  // Conflicting type
     };
-```
 
-```ts
 type Reason =
   | { kind: "ref"; from: NodeId; to: NodeId; raw?: string }
   | { kind: "anchor"; node: NodeId; nominal: NominalId }
@@ -246,16 +351,16 @@ type Reason =
 
 ---
 
-## 5. 设计原则总结
+## 7. Design Principles
 
-* **求解的是"文档自身类型"，不是 OpenAPI schema 语义**
-* `$ref` 是 **完全等价（identity / substitution）**
-* 等价类内不做 widening merge，只做一致性检查
-* 等价类之间不存在 subtype 或依赖关系
-* Nominal 是 **命名/导出层概念**，不参与结构求解
-* 冲突直接报错，需可解释（proof path）
+1. **Document structure types, not OpenAPI schema semantics** - We solve what the JSON looks like, not what it means
+2. **`$ref` is identity/substitution** - Nodes connected by `$ref` are equivalent
+3. **No widening or merging** - Equivalence class members must be structurally identical
+4. **No subtyping between classes** - Each class is independent
+5. **Nominals are naming layer only** - They don't participate in structural solving
+6. **Conflicts are errors** - No silent resolution, always report with proof paths
+7. **Stateless solver** - All input provided upfront, enables incremental caching at upper layer
 
 ---
 
-> 本质是：**等价类（$ref） + 结构一致性检查（unify） + 名义命名层**
-
+> **Essence:** Equivalence classes (`$ref`) + Structural consistency (unify) + Nominal naming layer + SCC-based incremental analysis

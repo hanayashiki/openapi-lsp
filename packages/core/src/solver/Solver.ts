@@ -145,7 +145,6 @@ export class Solver {
     const ctx = new SolveContext(input);
 
     this.buildEquivalenceClasses(ctx);
-    this.processIncomingNominals(ctx);
     this.computeTypes(ctx);
 
     return new SolveResultImpl(
@@ -196,64 +195,49 @@ export class Solver {
       };
 
       // Check for nominal conflicts and assign nominal
+      // Collect all nominals from both local (ctx.nominals) and incoming (ctx.incomingNominals)
       let firstNominal: { node: NodeId; nominal: NominalId } | null = null;
+
+      const tryAssignNominal = (node: NodeId, nominal: NominalId) => {
+        if (firstNominal === null) {
+          firstNominal = { node, nominal };
+          cls.nominal = nominal;
+        } else if (firstNominal.nominal !== nominal) {
+          ctx.diagnostics.push({
+            code: "NOMINAL_CONFLICT",
+            a: firstNominal.nominal,
+            b: nominal,
+            proofA: [
+              {
+                kind: "anchor",
+                node: firstNominal.node,
+                nominal: firstNominal.nominal,
+              },
+            ],
+            proofB: [{ kind: "anchor", node, nominal }],
+          });
+        }
+      };
 
       for (const node of nodeSet) {
         ctx.nodeToClass.set(node, classId);
 
-        // Check nominals for all nodes (including external nodes)
-        // External nodes can have nominals from outgoingNominals
-        const nominal = ctx.nominals.get(node);
-        if (nominal) {
-          if (firstNominal === null) {
-            firstNominal = { node, nominal };
-            cls.nominal = nominal;
-          } else if (firstNominal.nominal !== nominal) {
-            ctx.diagnostics.push({
-              code: "NOMINAL_CONFLICT",
-              a: firstNominal.nominal,
-              b: nominal,
-              proofA: [
-                {
-                  kind: "anchor",
-                  node: firstNominal.node,
-                  nominal: firstNominal.nominal,
-                },
-              ],
-              proofB: [{ kind: "anchor", node, nominal }],
-            });
+        // Check local nominals
+        const localNominal = ctx.nominals.get(node);
+        if (localNominal) {
+          tryAssignNominal(node, localNominal);
+        }
+
+        // Check incoming nominals from upstream SCCs
+        const incomingNominals = ctx.incomingNominals.get(node);
+        if (incomingNominals) {
+          for (const nominal of incomingNominals) {
+            tryAssignNominal(node, nominal);
           }
         }
       }
 
       ctx.classes.set(classId, cls);
-    }
-  }
-
-  /**
-   * Process incoming nominals - check for conflicts and assign to classes.
-   */
-  private processIncomingNominals(ctx: SolveContext): void {
-    for (const [nodeId, nominals] of ctx.incomingNominals) {
-      const classId = ctx.nodeToClass.get(nodeId);
-      if (classId === undefined) continue;
-
-      const cls = ctx.classes.get(classId);
-      if (!cls) continue;
-
-      for (const nominal of nominals) {
-        if (cls.nominal === null) {
-          cls.nominal = nominal;
-        } else if (cls.nominal !== nominal) {
-          ctx.diagnostics.push({
-            code: "NOMINAL_CONFLICT",
-            a: cls.nominal,
-            b: nominal,
-            proofA: [{ kind: "anchor", node: nodeId, nominal: cls.nominal }],
-            proofB: [{ kind: "anchor", node: nodeId, nominal }],
-          });
-        }
-      }
     }
   }
 
@@ -464,12 +448,6 @@ export class Solver {
 
         return { kind: "object", fields };
       }
-
-      case "nominal":
-        return a.id === (b as { kind: "nominal"; id: string }).id ? a : null;
-
-      default:
-        return null;
     }
   }
 }

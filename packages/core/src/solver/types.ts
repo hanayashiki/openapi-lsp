@@ -20,8 +20,7 @@ export type JSONType =
   | { kind: "prim"; prim: "null" | "bool" | "number" | "string" }
   | { kind: "array"; elem: JSONType }
   | { kind: "object"; fields: Record<string, JSONType> }
-  | { kind: "typevar" } // Unresolved type (e.g., isolated $ref cycle)
-  | { kind: "nominal"; id: NominalId }; // Named type reference
+  | { kind: "typevar" }; // Unresolved type (e.g., isolated $ref cycle)
 
 /**
  * Local shape fact (input to the solver).
