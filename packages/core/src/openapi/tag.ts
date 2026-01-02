@@ -56,6 +56,28 @@ export const TaggedObject = <T extends core.$ZodLooseShape>(
   }) as never;
 };
 
+/**
+ * Like TaggedObject but with a fallback value for lenient parsing.
+ * Tags both successful parses and fallback values.
+ */
+export const TaggedObjectCatch = <T extends core.$ZodLooseShape>(
+  shape: T,
+  tag: OpenAPITag,
+  fallback: z.infer<ZodObject<util.Writeable<T>>>
+): ZodObject<util.Writeable<T>, core.$strip> => {
+  return z
+    .object(shape)
+    .transform((value) => {
+      addTag(value, tag);
+      return value;
+    })
+    .catch((() => {
+      const result = { ...fallback };
+      addTag(result, tag);
+      return result;
+    }) as never) as never;
+};
+
 export const TaggedRecord = <T extends core.SomeType>(
   value: T,
   tag: OpenAPITag,

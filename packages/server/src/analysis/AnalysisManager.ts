@@ -16,8 +16,11 @@ import {
   GroupAnalysisResult,
 } from "./Analysis.js";
 import { parseSpecDocument } from "./analyze.js";
-import { extractNodes, extractStructuralNominals } from "./solver.js";
-import { isNodeInDocument } from "@openapi-lsp/core/json-pointer";
+import { extractFromNode } from "./solver.js";
+import {
+  isNodeInDocument,
+  uriWithJsonPointerLoose,
+} from "@openapi-lsp/core/json-pointer";
 import { extendMap } from "@openapi-lsp/core/collections";
 import { OpenAPITag } from "@openapi-lsp/core/openapi";
 import { Workspace } from "../workspace/Workspace.js";
@@ -132,48 +135,39 @@ export class AnalysisManager {
         // 3. Get member URIs for this group
         const memberUris = dc.analysisGroups.get(groupId) ?? new Set([groupId]);
 
-        // 4. Extract nodes/nominals from each document
+        // 4. Extract nodes/nominals from each document using unified approach
         const allNodes = new Map<NodeId, LocalShape>();
         const allNominals = new Map<NodeId, NominalId>();
 
         for (const uri of memberUris) {
           const doc = await this.documentManager.load(ctx, uri);
+          if (doc.type === "tomb") continue;
+
+          // Build incoming nominals for this document
+          const docIncomings = new Map<NodeId, OpenAPITag[]>();
+
+          // OpenAPI docs: implicit "Document" nominal at root
           if (doc.type === "openapi") {
-            const parseResult = await this.parseResultLoader.load(ctx, [
-              "specDocument.parse",
-              uri,
-            ]);
-            const { nodes, nominals, outgoingNominals } = extractNodes(
-              uri,
-              doc,
-              parseResult.document
-            );
-
-            extendMap(allNodes, nodes);
-            extendMap(allNominals, nominals);
-            extendMap(allNominals, outgoingNominals);
+            const rootNodeId = uriWithJsonPointerLoose(uri, []);
+            docIncomings.set(rootNodeId, ["Document"]);
           }
-          // Component files: nodes from YAML, nominals from structural propagation
-          else if (doc.type === "component") {
-            const shapes = doc.yaml.collectLocalShapes(uri);
-            extendMap(allNodes, shapes);
 
-            // For nodes with incoming nominals, extract structural nominals
-            // This propagates nominals through the component's structure
-            for (const [nodeId, incomings] of incomingNominals) {
-              // Only process nodes that belong to this document
-              if (!isNodeInDocument(nodeId, uri)) continue;
+          // Add external incoming nominals
+          for (const [nodeId, incomings] of incomingNominals) {
+            if (isNodeInDocument(nodeId, uri)) {
+              if (!docIncomings.has(nodeId)) docIncomings.set(nodeId, []);
+              docIncomings.get(nodeId)!.push(...(incomings as OpenAPITag[]));
+            }
+          }
 
-              for (const incomingNominal of incomings) {
-                const { outgoing, local } =
-                  extractStructuralNominals(
-                    uri,
-                    doc,
-                    nodeId,
-                    incomingNominal as OpenAPITag
-                  ) ?? {};
-                extendMap(allNominals, outgoing);
-                extendMap(allNominals, local);
+          // Extract from each entry point
+          for (const [nodeId, nominals] of docIncomings) {
+            for (const nominal of nominals) {
+              const result = extractFromNode(uri, doc, nodeId, nominal);
+              if (result) {
+                extendMap(allNodes, result.nodes);
+                extendMap(allNominals, result.outgoingNominals);
+                extendMap(allNominals, result.localNominals);
               }
             }
           }

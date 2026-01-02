@@ -4,7 +4,12 @@
  */
 
 import { z } from "zod";
-import { setOpenAPITag, setReferenceNominal, OpenAPITag, TaggedRecord } from "./tag.js";
+import {
+  TaggedRecord,
+  TaggedObjectCatch,
+  TaggedObject,
+  TaggedReference,
+} from "./tag.js";
 
 // ------------------------------------------------------------------------------
 // OpenAPI Namespace
@@ -26,93 +31,87 @@ export namespace OpenAPIInput {
     })
     .catch({ $ref: "" });
 
-  /**
-   * Creates a Reference schema that expects a specific OpenAPI node type.
-   * The nominal is stored in referenceNominalStorage when parsed.
-   * Also adds "Reference" tag so the Visitor can detect it.
-   *
-   * NOTE: No .catch() here - we need the union to try other options if $ref is missing.
-   * The union will handle fallbacks at the parent level.
-   */
-  const TaggedReference = (nominal: OpenAPITag) => {
-    return z
-      .object({
-        $ref: z.string(),
-      })
-      .transform((value) => {
-        setOpenAPITag(value, "Reference");
-        setReferenceNominal(value, nominal);
-        return value;
-      });
-  };
-
   // XML Object
-  export const XML = z
-    .object({
+  export const XML = TaggedObjectCatch(
+    {
       name: z.string().optional().catch(undefined),
       namespace: z.string().optional().catch(undefined),
       prefix: z.string().optional().catch(undefined),
       attribute: z.boolean().optional().catch(undefined),
       wrapped: z.boolean().optional().catch(undefined),
-    })
-    .catch({});
+    },
+    "XML",
+    {}
+  );
 
   // Discriminator Object
-  export const Discriminator = z
-    .object({
+  export const Discriminator = TaggedObjectCatch(
+    {
       propertyName: z.string().catch(""),
       mapping: z
         .record(z.string(), z.string().catch(""))
         .optional()
         .catch(undefined),
-    })
-    .catch({ propertyName: "" });
+    },
+    "Discriminator",
+    { propertyName: "" }
+  );
 
   // Contact Object
-  export const Contact = z
-    .object({
+  export const Contact = TaggedObjectCatch(
+    {
       name: z.string().optional().catch(undefined),
       url: z.string().optional().catch(undefined),
       email: z.string().optional().catch(undefined),
-    })
-    .catch({});
+    },
+    "Contact",
+    {}
+  );
 
   // License Object
-  export const License = z
-    .object({
+  export const License = TaggedObjectCatch(
+    {
       name: z.string().catch(""),
       url: z.string().optional().catch(undefined),
-    })
-    .catch({ name: "" });
+    },
+    "License",
+    { name: "" }
+  );
 
   // Server Variable Object
-  export const ServerVariable = z
-    .object({
+  export const ServerVariable = TaggedObjectCatch(
+    {
       enum: z.array(z.string().catch("")).optional().catch(undefined),
       default: z.string().catch(""),
       description: z.string().optional().catch(undefined),
-    })
-    .catch({ default: "" });
+    },
+    "ServerVariable",
+    { default: "" }
+  );
 
   // OAuth Flow Object
-  export const OAuthFlow = z
-    .object({
+  export const OAuthFlow = TaggedObjectCatch(
+    {
       authorizationUrl: z.string().optional().catch(undefined),
       tokenUrl: z.string().optional().catch(undefined),
       refreshUrl: z.string().optional().catch(undefined),
       scopes: z.record(z.string(), z.string().catch("")).catch({}),
-    })
-    .catch({ scopes: {} });
+    },
+    "OAuthFlow",
+    { scopes: {} }
+  );
 
   // Example Object
-  export const Example = z
-    .object({
+  export const Example = TaggedObjectCatch(
+    {
       summary: z.string().optional().catch(undefined),
       description: z.string().optional().catch(undefined),
       value: z.unknown().optional(),
       externalValue: z.string().optional().catch(undefined),
-    })
-    .catch({});
+    },
+    "Example",
+    {}
+  );
 
   // Security Requirement Object
   export const SecurityRequirement = z
@@ -124,34 +123,40 @@ export namespace OpenAPIInput {
   // ===========================================================================
 
   // External Documentation Object
-  export const ExternalDocumentation = z
-    .object({
+  export const ExternalDocumentation = TaggedObjectCatch(
+    {
       description: z.string().optional().catch(undefined),
       url: z.string().catch(""),
-    })
-    .catch({ url: "" });
+    },
+    "ExternalDocumentation",
+    { url: "" }
+  );
 
   // OAuth Flows Object
-  export const OAuthFlows = z
-    .object({
+  export const OAuthFlows = TaggedObjectCatch(
+    {
       implicit: OAuthFlow.optional().catch(undefined),
       password: OAuthFlow.optional().catch(undefined),
       clientCredentials: OAuthFlow.optional().catch(undefined),
       authorizationCode: OAuthFlow.optional().catch(undefined),
-    })
-    .catch({});
+    },
+    "OAuthFlows",
+    {}
+  );
 
   // Server Object
-  export const Server = z
-    .object({
+  export const Server = TaggedObjectCatch(
+    {
       url: z.string().catch(""),
       description: z.string().optional().catch(undefined),
       variables: z
         .record(z.string(), ServerVariable)
         .optional()
         .catch(undefined),
-    })
-    .catch({ url: "" });
+    },
+    "Server",
+    { url: "" }
+  );
 
   // ===========================================================================
   // Layer 3: Schema (recursive - uses z.lazy)
@@ -203,8 +208,8 @@ export namespace OpenAPIInput {
   );
 
   export const Schema: z.ZodType<SchemaType> = z.lazy(() =>
-    z
-      .object({
+    TaggedObject(
+      {
         // JSON Schema properties
         title: z.string().optional().catch(undefined),
         multipleOf: z.number().optional().catch(undefined),
@@ -251,11 +256,9 @@ export namespace OpenAPIInput {
         externalDocs: ExternalDocumentation.optional().catch(undefined),
         example: z.unknown().optional(),
         deprecated: z.boolean().optional().catch(undefined),
-      })
-      .transform((value) => {
-        setOpenAPITag(value, "Schema");
-        return value;
-      })
+      },
+      "Schema"
+    )
   );
 
   // ===========================================================================
@@ -268,8 +271,8 @@ export namespace OpenAPIInput {
   const ExampleOrReference = z.union([TaggedReference("Example"), Example]);
 
   // Encoding Object
-  export const Encoding = z
-    .object({
+  export const Encoding = TaggedObjectCatch(
+    {
       contentType: z.string().optional().catch(undefined),
       headers: z
         .record(z.string(), z.union([Reference, z.unknown()]))
@@ -278,12 +281,14 @@ export namespace OpenAPIInput {
       style: z.string().optional().catch(undefined),
       explode: z.boolean().optional().catch(undefined),
       allowReserved: z.boolean().optional().catch(undefined),
-    })
-    .catch({});
+    },
+    "Encoding",
+    {}
+  );
 
   // MediaType Object
-  export const MediaType = z
-    .object({
+  export const MediaType = TaggedObjectCatch(
+    {
       schema: SchemaOrReference.optional().catch(undefined),
       example: z.unknown().optional(),
       examples: z
@@ -291,14 +296,16 @@ export namespace OpenAPIInput {
         .optional()
         .catch(undefined),
       encoding: z.record(z.string(), Encoding).optional().catch(undefined),
-    })
-    .catch({});
+    },
+    "MediaType",
+    {}
+  );
 
   export const Content = TaggedRecord(MediaType, "Content");
 
   // Header Object
-  export const Header = z
-    .object({
+  export const Header = TaggedObjectCatch(
+    {
       description: z.string().optional().catch(undefined),
       required: z.boolean().optional().catch(undefined),
       deprecated: z.boolean().optional().catch(undefined),
@@ -313,28 +320,32 @@ export namespace OpenAPIInput {
         .optional()
         .catch(undefined),
       content: Content.optional().catch(undefined),
-    })
-    .catch({});
+    },
+    "Header",
+    {}
+  );
 
   const HeaderOrReference = z.union([TaggedReference("Header"), Header]);
 
   // Link Object
-  export const Link = z
-    .object({
+  export const Link = TaggedObjectCatch(
+    {
       operationRef: z.string().optional().catch(undefined),
       operationId: z.string().optional().catch(undefined),
       parameters: z.record(z.string(), z.unknown()).optional().catch(undefined),
       requestBody: z.unknown().optional(),
       description: z.string().optional().catch(undefined),
       server: Server.optional().catch(undefined),
-    })
-    .catch({});
+    },
+    "Link",
+    {}
+  );
 
   const LinkOrReference = z.union([TaggedReference("Link"), Link]);
 
   // Response Object
-  export const Response = z
-    .object({
+  export const Response = TaggedObjectCatch(
+    {
       description: z.string().catch(""),
       headers: z
         .record(z.string(), HeaderOrReference)
@@ -342,14 +353,16 @@ export namespace OpenAPIInput {
         .catch(undefined),
       content: Content.optional().catch(undefined),
       links: z.record(z.string(), LinkOrReference).optional().catch(undefined),
-    })
-    .catch({ description: "" });
+    },
+    "Response",
+    { description: "" }
+  );
 
   const ResponseOrReference = z.union([TaggedReference("Response"), Response]);
 
   // Parameter Object
-  export const Parameter = z
-    .object({
+  export const Parameter = TaggedObjectCatch(
+    {
       name: z.string().catch(""),
       in: z.enum(["query", "header", "path", "cookie"]).catch("query"),
       description: z.string().optional().catch(undefined),
@@ -366,8 +379,10 @@ export namespace OpenAPIInput {
         .optional()
         .catch(undefined),
       content: Content.optional().catch(undefined),
-    })
-    .catch({ name: "", in: "query" });
+    },
+    "Parameter",
+    { name: "", in: "query" }
+  );
 
   const ParameterOrReference = z.union([
     TaggedReference("Parameter"),
@@ -375,13 +390,15 @@ export namespace OpenAPIInput {
   ]);
 
   // Request Body Object
-  export const RequestBody = z
-    .object({
+  export const RequestBody = TaggedObjectCatch(
+    {
       description: z.string().optional().catch(undefined),
       content: Content.catch({}),
       required: z.boolean().optional().catch(undefined),
-    })
-    .catch({ content: {} });
+    },
+    "RequestBody",
+    { content: {} }
+  );
 
   const RequestBodyOrReference = z.union([
     TaggedReference("RequestBody"),
@@ -389,8 +406,8 @@ export namespace OpenAPIInput {
   ]);
 
   // Security Scheme Object
-  export const SecurityScheme = z
-    .object({
+  export const SecurityScheme = TaggedObjectCatch(
+    {
       type: z
         .enum(["apiKey", "http", "oauth2", "openIdConnect"])
         .catch("apiKey"),
@@ -401,8 +418,10 @@ export namespace OpenAPIInput {
       bearerFormat: z.string().optional().catch(undefined),
       flows: OAuthFlows.optional().catch(undefined),
       openIdConnectUrl: z.string().optional().catch(undefined),
-    })
-    .catch({ type: "apiKey" });
+    },
+    "SecurityScheme",
+    { type: "apiKey" }
+  );
 
   const SecuritySchemeOrReference = z.union([
     TaggedReference("SecurityScheme"),
@@ -414,8 +433,8 @@ export namespace OpenAPIInput {
   // ===========================================================================
 
   // Operation Object
-  export const Operation = z
-    .object({
+  export const Operation = TaggedObjectCatch(
+    {
       tags: z.array(z.string().catch("")).optional().catch(undefined),
       summary: z.string().optional().catch(undefined),
       description: z.string().optional().catch(undefined),
@@ -428,12 +447,14 @@ export namespace OpenAPIInput {
       deprecated: z.boolean().optional().catch(undefined),
       security: z.array(SecurityRequirement).optional().catch(undefined),
       servers: z.array(Server).optional().catch(undefined),
-    })
-    .catch({ responses: {} });
+    },
+    "Operation",
+    { responses: {} }
+  );
 
   // Path Item Object
-  export const PathItem = z
-    .object({
+  export const PathItem = TaggedObjectCatch(
+    {
       summary: z.string().optional().catch(undefined),
       description: z.string().optional().catch(undefined),
       get: Operation.optional().catch(undefined),
@@ -446,8 +467,10 @@ export namespace OpenAPIInput {
       trace: Operation.optional().catch(undefined),
       servers: z.array(Server).optional().catch(undefined),
       parameters: z.array(ParameterOrReference).optional().catch(undefined),
-    })
-    .catch({});
+    },
+    "PathItem",
+    {}
+  );
 
   const PathItemOrReference = z.union([TaggedReference("PathItem"), PathItem]);
 
@@ -461,8 +484,8 @@ export namespace OpenAPIInput {
   // ===========================================================================
 
   // Components Object
-  export const Components = z
-    .object({
+  export const Components = TaggedObjectCatch(
+    {
       schemas: z
         .record(z.string(), SchemaOrReference)
         .optional()
@@ -496,37 +519,43 @@ export namespace OpenAPIInput {
         .record(z.string(), CallbackOrReference)
         .optional()
         .catch(undefined),
-    })
-    .catch({});
+    },
+    "Components",
+    {}
+  );
 
   // ===========================================================================
   // Layer 7: Top-level types
   // ===========================================================================
 
   // Tag Object
-  export const Tag = z
-    .object({
+  export const Tag = TaggedObjectCatch(
+    {
       name: z.string().catch(""),
       description: z.string().optional().catch(undefined),
       externalDocs: ExternalDocumentation.optional().catch(undefined),
-    })
-    .catch({ name: "" });
+    },
+    "Tag",
+    { name: "" }
+  );
 
   // Info Object
-  export const Info = z
-    .object({
+  export const Info = TaggedObjectCatch(
+    {
       title: z.string().catch(""),
       description: z.string().optional().catch(undefined),
       termsOfService: z.string().optional().catch(undefined),
       contact: Contact.optional().catch(undefined),
       license: License.optional().catch(undefined),
       version: z.string().catch("0.0.0"),
-    })
-    .catch({ title: "", version: "0.0.0" });
+    },
+    "Info",
+    { title: "", version: "0.0.0" }
+  );
 
   // OpenAPI Document Object
-  export const Document = z
-    .object({
+  export const Document = TaggedObjectCatch(
+    {
       openapi: z.string().catch("3.0.3"),
       info: Info,
       servers: z.array(Server).optional().catch(undefined),
@@ -538,8 +567,10 @@ export namespace OpenAPIInput {
       security: z.array(SecurityRequirement).optional().catch(undefined),
       tags: z.array(Tag).optional().catch(undefined),
       externalDocs: ExternalDocumentation.optional().catch(undefined),
-    })
-    .catch({ openapi: "3.0.3", info: { title: "", version: "0.0.0" } });
+    },
+    "Document",
+    { openapi: "3.0.3", info: { title: "", version: "0.0.0" } }
+  );
 
   // ===========================================================================
   // Type exports
