@@ -134,7 +134,7 @@ export class AnalysisManager {
     this.groupAnalysisLoader = cache.createLoader(
       async ([_, groupId], ctx): Promise<LoaderResult<GroupAnalysisResult>> => {
         // 1. Load document connectivity
-        // FIXME: retrieve upstreams from context, since `documentConnectivity` is updated on every change!
+        // Even if `documentConnectivity` is updated on every AST edit, the $ref should rarely change.
         const dc = await this.documentConnectivityLoader.load(ctx, [
           "documentConnectivity",
         ]);

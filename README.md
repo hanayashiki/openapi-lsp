@@ -1,32 +1,76 @@
 # OpenAPI LSP
 
-VS Code extension providing language support for OpenAPI specifications.
-
-![Screenshot](/docs/screenshot.png)
+Intelligent language support for OpenAPI/Swagger specifications in VS Code, designed for a great dev experience through deep understanding of your openapi.yml.
 
 ## Features
 
-- [x] Hover - display schemas as TypeScript types
-- [x] Go to Definition
-- [ ] Find All References
-- [ ] Diagnostics
-- [ ] Autocomplete
+- **Type Inference** — Automatically infers and displays types from your OpenAPI schemas, including referenced files.
+- **Hover Information** — View schemas rendered as human-readable types
+- **Go to Definition** — Jump to component definitions across files
+- **Cross-File Analysis** — Full support for external `$ref` references
+- **Secure by Default** — Workspace-restricted file access prevents data leaks
+
+### Hover Information
+
+#### Inspect OpenAPI Documents
+
+Hover over schemas to see them rendered as TypeScript types:
+
+![Hover OpenAPI schema](/docs/hover-openapi.png)
+
+#### Inspect Referenced Files
+
+Hover over `$ref` targets to see how they're used in context:
+
+![Referenced file hover](/docs/ref-hover.png)
+
+### Go to Definition
+
+Jump directly to component definitions or peek them inline:
+
+![Go to definition](/docs/def.png)
+
+## Installation
+
+Install from the [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=hanayashiki.openapilspclient) or via command line:
+
+```bash
+code --install-extension hanayashiki.openapilspclient
+```
 
 ## Supported Files
 
-- `*.openapi.yml`
-- `*.openapi.yaml`
-- `openapi.yml`
-- `openapi.yaml`
+| Pattern                           | Description               |
+| --------------------------------- | ------------------------- |
+| `*.openapi.yml`, `*.openapi.yaml` | Files with OpenAPI suffix |
+| `openapi.yml`, `openapi.yaml`     | Root OpenAPI files        |
 
-## Limitations
+**Referenced files** (`$ref` targets): `*.json`, `*.yml`, `*.yaml`
 
-- OpenAPI >= 3.0.0
-- Workspace folders use the same settings in `.code-workspace`
+## Requirements
 
-## Contributors
+- OpenAPI 3.0.0 or later
 
-- hanayashiki <https://github.com/hanayashiki>
+## Settings
+
+| Setting                             | Default                                     | Description                                 |
+| ----------------------------------- | ------------------------------------------- | ------------------------------------------- |
+| `openapi-lsp.discoverRoots.pattern` | `**/*`                                      | Glob pattern for OpenAPI document discovery |
+| `openapi-lsp.discoverRoots.ignore`  | `{**/node_modules/**,**/.git/**,**/.hg/**}` | Glob pattern to exclude from discovery      |
+| `openapi-lsp.debug.cache`           | `false`                                     | Enable debug logging for cache operations   |
+
+**Command:** `OpenAPI: Restart Language Server` — Restart the language server
+
+## Roadmap
+
+- Find All References
+- Diagnostics
+- Autocomplete
+- Remote `$ref` support
+
+## Contributing
+
+Contributions welcome! Please open an issue or submit a pull request.
 
 ## License
 
