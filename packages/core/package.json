@@ -12,7 +12,8 @@
     "./constants": "./src/constants/index.ts",
     "./solver": "./src/solver/index.ts",
     "./configuration": "./src/configuration/index.ts",
-    "./collections": "./src/collections/index.ts"
+    "./collections": "./src/collections/index.ts",
+    "./ecmascript": "./src/ecmascript/index.ts"
   },
   "scripts": {
     "test": "vitest run",

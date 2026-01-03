@@ -1,5 +1,6 @@
 import { OpenAPI } from "@openapi-lsp/core/openapi";
 import type { SerializerContext } from "./types.js";
+import { Printer } from "./Printer.js";
 // oxlint-disable-next-line
 import { serializeSchemaOrRef } from "./serializeSchema.js";
 
@@ -7,15 +8,22 @@ import { serializeSchemaOrRef } from "./serializeSchema.js";
 export function serializeArray(
   schema: OpenAPI.Schema,
   ctx: SerializerContext
-): string {
+): void {
+  const { printer } = ctx;
+
   if (!schema.items) {
-    return "unknown[]";
+    printer.write("unknown[]");
+    return;
   }
 
-  const itemType = serializeSchemaOrRef(schema.items, {
+  // Serialize item type to a temporary printer to check complexity
+  const tempPrinter = new Printer(0);
+  serializeSchemaOrRef(schema.items, {
     ...ctx,
+    printer: tempPrinter,
     currentDepth: ctx.currentDepth + 1,
   });
+  const itemType = tempPrinter.toString();
 
   // Use Array<T> for complex types, T[] for simple
   if (
@@ -23,7 +31,8 @@ export function serializeArray(
     itemType.includes(" & ") ||
     itemType.includes("{")
   ) {
-    return `Array<${itemType}>`;
+    printer.write(`Array<${itemType}>`);
+  } else {
+    printer.write(`${itemType}[]`);
   }
-  return `${itemType}[]`;
 }

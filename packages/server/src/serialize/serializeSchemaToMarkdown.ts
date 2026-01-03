@@ -1,5 +1,6 @@
 import { OpenAPI } from "@openapi-lsp/core/openapi";
 import type { SerializeOptions, SerializerContext } from "./types.js";
+import { Printer } from "./Printer.js";
 import { serializeSchemaOrRef } from "./serializeSchema.js";
 
 /**
@@ -11,14 +12,6 @@ export function serializeSchemaToMarkdown(
 ): string {
   const { maxDepth = 2, name } = options;
 
-  const ctx: SerializerContext = {
-    currentDepth: 0,
-    maxDepth,
-    indent: 0,
-  };
-
-  const serialized = serializeSchemaOrRef(schema, ctx);
-
   // Build markdown output
   const parts: string[] = [];
 
@@ -29,6 +22,17 @@ export function serializeSchemaToMarkdown(
   if (schema.description) {
     parts.push(schema.description);
   }
+
+  // Serialize schema with printer (0 base indent for code block content)
+  const printer = new Printer(0);
+  const ctx: SerializerContext = {
+    currentDepth: 0,
+    maxDepth,
+    printer,
+  };
+
+  serializeSchemaOrRef(schema, ctx);
+  const serialized = printer.toString();
 
   // Add code block
   const nameOrInline = name ? `type ${name} = ` : "";

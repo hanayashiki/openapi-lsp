@@ -1,4 +1,4 @@
-import { indent } from "./utils.js";
+import { Printer } from "./Printer.js";
 
 export interface LiteralSerializeOptions {
   maxDepth?: number; // Default: 2
@@ -9,81 +9,93 @@ interface LiteralSerializerContext {
   currentDepth: number;
   maxDepth: number;
   maxItems: number;
-  indent: number;
+  printer: Printer;
 }
 
-function serializeLiteral(value: unknown, ctx: LiteralSerializerContext): string {
+function serializeLiteral(value: unknown, ctx: LiteralSerializerContext): void {
+  const { printer } = ctx;
+
   // Depth limit reached
   if (ctx.currentDepth > ctx.maxDepth) {
-    return "...";
+    printer.write("...");
+    return;
   }
 
   if (value === null) {
-    return "null";
+    printer.write("null");
+    return;
   }
 
   if (typeof value === "string") {
-    return JSON.stringify(value);
+    printer.write(JSON.stringify(value));
+    return;
   }
 
   if (typeof value === "number" || typeof value === "boolean") {
-    return String(value);
+    printer.write(String(value));
+    return;
   }
 
   if (Array.isArray(value)) {
     if (value.length === 0) {
-      return "[]";
+      printer.write("[]");
+      return;
     }
-
-    const nextCtx: LiteralSerializerContext = {
-      ...ctx,
-      currentDepth: ctx.currentDepth + 1,
-      indent: ctx.indent + 1,
-    };
 
     const items = value.slice(0, ctx.maxItems);
     const hasMore = value.length > ctx.maxItems;
 
-    const lines: string[] = ["["];
+    printer.write("[");
+    printer.pushIndentation(3);
+
     for (const item of items) {
-      const serialized = serializeLiteral(item, nextCtx);
-      lines.push(`${indent(ctx.indent + 1)}${serialized},`);
+      printer.newline();
+      serializeLiteral(item, {
+        ...ctx,
+        currentDepth: ctx.currentDepth + 1,
+      });
+      printer.write(",");
     }
     if (hasMore) {
-      lines.push(`${indent(ctx.indent + 1)}... (${value.length - ctx.maxItems} more)`);
+      printer.newline().write(`... (${value.length - ctx.maxItems} more)`);
     }
-    lines.push(`${indent(ctx.indent)}]`);
-    return lines.join("\n");
+
+    printer.popIndentation();
+    printer.newline().write("]");
+    return;
   }
 
   if (typeof value === "object") {
     const entries = Object.entries(value);
     if (entries.length === 0) {
-      return "{}";
+      printer.write("{}");
+      return;
     }
-
-    const nextCtx: LiteralSerializerContext = {
-      ...ctx,
-      currentDepth: ctx.currentDepth + 1,
-      indent: ctx.indent + 1,
-    };
 
     const items = entries.slice(0, ctx.maxItems);
     const hasMore = entries.length > ctx.maxItems;
 
-    const lines: string[] = ["{"];
+    printer.write("{");
+    printer.pushIndentation(3);
+
     for (const [key, val] of items) {
-      const serialized = serializeLiteral(val, nextCtx);
-      lines.push(`${indent(ctx.indent + 1)}${JSON.stringify(key)}: ${serialized},`);
+      printer.newline().write(`${JSON.stringify(key)}: `);
+      serializeLiteral(val, {
+        ...ctx,
+        currentDepth: ctx.currentDepth + 1,
+      });
+      printer.write(",");
     }
     if (hasMore) {
-      lines.push(`${indent(ctx.indent + 1)}... (${entries.length - ctx.maxItems} more)`);
+      printer.newline().write(`... (${entries.length - ctx.maxItems} more)`);
     }
-    lines.push(`${indent(ctx.indent)}}`)
-    return lines.join("\n");
+
+    printer.popIndentation();
+    printer.newline().write("}");
+    return;
   }
 
-  return "unknown";
+  printer.write("unknown");
 }
 
 /**
@@ -97,14 +109,16 @@ export function serializeLiteralToMarkdown(
 ): string {
   const { maxDepth = 2, maxItems = 5 } = options;
 
+  const printer = new Printer(0);
   const ctx: LiteralSerializerContext = {
     currentDepth: 0,
     maxDepth,
     maxItems,
-    indent: 0,
+    printer,
   };
 
-  const serialized = serializeLiteral(value, ctx);
+  serializeLiteral(value, ctx);
+  const serialized = printer.toString();
 
   return `**${name}**\n\n\`\`\`json\n${serialized}\n\`\`\``;
 }

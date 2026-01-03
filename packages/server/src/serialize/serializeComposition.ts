@@ -1,5 +1,6 @@
 import { OpenAPI } from "@openapi-lsp/core/openapi";
 import type { SerializerContext } from "./types.js";
+import { Printer } from "./Printer.js";
 // oxlint-disable-next-line no-cycle
 import { serializeSchemaOrRef } from "./serializeSchema.js";
 
@@ -8,10 +9,19 @@ export function serializeComposition(
   schemas: (OpenAPI.Schema | OpenAPI.Reference)[],
   operator: "&" | "|",
   ctx: SerializerContext
-): string {
-  const serialized = schemas.map((s) =>
-    serializeSchemaOrRef(s, { ...ctx, currentDepth: ctx.currentDepth + 1 })
-  );
+): void {
+  const { printer } = ctx;
+
+  // Serialize each schema to a temporary printer to get the string representation
+  const serialized = schemas.map((s) => {
+    const tempPrinter = new Printer(0);
+    serializeSchemaOrRef(s, {
+      ...ctx,
+      printer: tempPrinter,
+      currentDepth: ctx.currentDepth + 1,
+    });
+    return tempPrinter.toString();
+  });
 
   // Wrap complex types in parentheses if needed
   const parts = serialized.map((s) => {
@@ -24,5 +34,5 @@ export function serializeComposition(
     return s;
   });
 
-  return parts.join(` ${operator} `);
+  printer.write(parts.join(` ${operator} `));
 }

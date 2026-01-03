@@ -2,6 +2,113 @@ import { describe, it, expect } from "vitest";
 import { createTestServer } from "./utils/testServer.js";
 
 describe("nominalPropagation", () => {
+  it("should assign Parameters nominal to inline parameters array", async () => {
+    const server = createTestServer({
+      "/workspace/openapi.yaml": {
+        openapi: "3.0.0",
+        info: { title: "Parameters Array Test", version: "1.0.0" },
+        paths: {
+          "/users": {
+            get: {
+              parameters: [
+                {
+                  name: "page",
+                  in: "query",
+                  schema: { type: "integer" },
+                },
+              ],
+              responses: {
+                "200": { description: "OK" },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    await server.analysisManager.discoverRoots();
+
+    const openapiUri = "file:///workspace/openapi.yaml";
+
+    // Analyze the openapi group
+    const result = await server.analysisManager.groupAnalysisLoader.use([
+      "groupAnalysis",
+      openapiUri,
+    ]);
+
+    // The parameters array should have "Parameters" nominal
+    const parametersNodeId = openapiUri + "#/paths/~1users/get/parameters";
+    expect(result.solveResult.getCanonicalNominal(parametersNodeId)).toBe(
+      "Parameters"
+    );
+
+    // Individual parameter should have "Parameter" nominal
+    const parameterNodeId = openapiUri + "#/paths/~1users/get/parameters/0";
+    expect(result.solveResult.getCanonicalNominal(parameterNodeId)).toBe(
+      "Parameter"
+    );
+  });
+
+  it("should propagate Parameter nominal to external parameter file", async () => {
+    const server = createTestServer({
+      "/workspace/openapi.yaml": {
+        openapi: "3.0.0",
+        info: { title: "Parameters Array Test", version: "1.0.0" },
+        paths: {
+          "/users": {
+            get: {
+              parameters: [
+                { $ref: "./parameters/page.yaml" },
+                { $ref: "./parameters/limit.yaml" },
+              ],
+              responses: {
+                "200": { description: "OK" },
+              },
+            },
+          },
+        },
+      },
+      "/workspace/parameters/page.yaml": {
+        name: "page",
+        in: "query",
+        schema: { type: "integer" },
+      },
+      "/workspace/parameters/limit.yaml": {
+        name: "limit",
+        in: "query",
+        schema: { type: "integer" },
+      },
+    });
+
+    await server.analysisManager.discoverRoots();
+
+    const openapiUri = "file:///workspace/openapi.yaml";
+    const pageUri = "file:///workspace/parameters/page.yaml";
+    const limitUri = "file:///workspace/parameters/limit.yaml";
+
+    // Analyze the openapi group
+    const openapiResult = await server.analysisManager.groupAnalysisLoader.use([
+      "groupAnalysis",
+      openapiUri,
+    ]);
+
+    // The outgoing nominal should be "Parameter" for each parameter file
+    const outgoingNominals = openapiResult.solveResult.getOutgoingNominals();
+    expect(outgoingNominals.get(pageUri)).toBe("Parameter");
+    expect(outgoingNominals.get(limitUri)).toBe("Parameter");
+
+    // Analyze the parameter files
+    const pageResult = await server.analysisManager.groupAnalysisLoader.use([
+      "groupAnalysis",
+      pageUri,
+    ]);
+
+    // The root node should have canonical nominal "Parameter"
+    expect(pageResult.solveResult.getCanonicalNominal(pageUri)).toBe(
+      "Parameter"
+    );
+  });
+
   it("should propagate Schema nominal to external YAML file", async () => {
     const server = createTestServer({
       "/workspace/openapi.yaml": {

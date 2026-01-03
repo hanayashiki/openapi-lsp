@@ -3,6 +3,7 @@ import {
   parseUriWithJsonPointer,
   uriWithJsonPointerLoose,
   JsonPointerLoose,
+  deriveIdentifierFromUri,
 } from "@openapi-lsp/core/json-pointer";
 import { TextDocument } from "vscode-languageserver-textdocument";
 import {
@@ -25,7 +26,21 @@ import {
   serializeToMarkdown,
   serializeLiteralToMarkdown,
 } from "./serialize/index.js";
-import { OpenAPITag } from "@openapi-lsp/core/openapi";
+import { OpenAPI, OpenAPITag } from "@openapi-lsp/core/openapi";
+import { SolveResult } from "@openapi-lsp/core/solver";
+import { unwrap } from "@openapi-lsp/core/result";
+
+/**
+ * Check if a value is a $ref object
+ */
+function isReference(value: unknown): value is { $ref: string } {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "$ref" in value &&
+    typeof (value as { $ref: unknown }).$ref === "string"
+  );
+}
 
 export class OpenAPILanguageServer {
   cache: QueryCache;
@@ -100,7 +115,6 @@ export class OpenAPILanguageServer {
     let targetDocUri: string;
     let targetNodeId: string;
     let targetPath: JsonPointerLoose;
-    let name: string;
 
     const refResult = spec.yaml.getRefAtPosition(params.position);
     if (refResult) {
@@ -113,7 +127,6 @@ export class OpenAPILanguageServer {
       targetDocUri = pointerResult.data.docUri;
       targetNodeId = pointerResult.data.url.toString();
       targetPath = pointerResult.data.jsonPointer;
-      name = String(targetPath.at(-1) ?? refResult.key) || "Unknown";
     } else {
       // Case 2: Hovering over YAML key
       const keyResult = spec.yaml.getKeyAtPosition(params.position);
@@ -139,15 +152,15 @@ export class OpenAPILanguageServer {
         targetDocUri = pointerResult.data.docUri;
         targetNodeId = pointerResult.data.url.toString();
         targetPath = pointerResult.data.jsonPointer;
-        name = String(targetPath.at(-1) ?? keyValue.$ref) || "Unknown";
       } else {
         // Regular value - use as-is
         targetDocUri = uri;
         targetNodeId = uriWithJsonPointerLoose(uri, keyResult.path);
         targetPath = keyResult.path;
-        name = keyResult.key;
       }
     }
+
+    const name: string = unwrap(deriveIdentifierFromUri(targetNodeId)); // We create the URI from ourselve, cannot fail.
 
     // Shared logic: get analysis, nominal, value, and serialize
     try {
@@ -185,10 +198,20 @@ export class OpenAPILanguageServer {
         return null;
       }
 
+      // For Parameters, resolve any $ref items to their actual values
+      let resolvedValue = value;
+      if (nominal === "Parameters" && Array.isArray(value)) {
+        resolvedValue = await this.resolveParameterRefs(
+          value,
+          targetNodeId,
+          groupResult.solveResult
+        );
+      }
+
       // Serialize: use nominal serializer if available, else literal fallback
       const markdown = nominal
-        ? serializeToMarkdown(nominal, value, name)
-        : serializeLiteralToMarkdown(value, name);
+        ? serializeToMarkdown(nominal, resolvedValue, name)
+        : serializeLiteralToMarkdown(resolvedValue, name);
 
       return {
         contents: {
@@ -200,5 +223,57 @@ export class OpenAPILanguageServer {
       console.error(`[onHover] Exception for ${targetNodeId}`, e);
       return null;
     }
+  }
+
+  /**
+   * Resolve $ref items in a Parameters array to their actual values.
+   * Uses the solver's getValueNodeId to find the ultimate target of each ref.
+   * Parameter nodes are special: their `name` is at the value, so it would not be possible for us
+   * to name the parameter unless we load it.
+   */
+  private async resolveParameterRefs(
+    items: unknown[],
+    parametersNodeId: string,
+    solveResult: SolveResult
+  ): Promise<OpenAPI.Parameter[]> {
+    const resolved: OpenAPI.Parameter[] = [];
+
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+
+      if (isReference(item)) {
+        // This is a $ref - resolve it using the solver
+        const itemNodeId = `${parametersNodeId}/${i}`;
+        const valueNodeId = solveResult.getValueNodeId(itemNodeId);
+
+        if (valueNodeId) {
+          // Parse the valueNodeId to get docUri and path
+          const parseResult = parseUriWithJsonPointer(valueNodeId);
+          if (parseResult.success) {
+            const doc = await this.documentManager.getServerDocument(
+              parseResult.data.docUri
+            );
+            if (doc.type !== "tomb") {
+              const value = doc.yaml.getValueAtPath(
+                parseResult.data.jsonPointer
+              );
+              if (value && typeof value === "object") {
+                resolved.push(value as OpenAPI.Parameter);
+                continue;
+              }
+            }
+          }
+        }
+        // Fallback: skip unresolvable refs
+        console.warn(
+          `[resolveParameterRefs] Could not resolve ref at index ${i}`
+        );
+      } else if (item && typeof item === "object") {
+        // Already a resolved Parameter object
+        resolved.push(item as OpenAPI.Parameter);
+      }
+    }
+
+    return resolved;
   }
 }

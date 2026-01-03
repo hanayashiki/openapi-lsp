@@ -81,8 +81,8 @@
     "workspaceContains:**/openapi.yaml"
   ],
   "scripts": {
-    "bundle": "node esbuild.mjs",
-    "watch": "node esbuild.mjs --watch",
+    "bundle": "tsx scripts/esbuild.ts",
+    "watch": "pnpm bundle --watch",
     "clean": "rm -rf dist *.tsbuildinfo",
     "package": "pnpm bundle && vsce package --no-dependencies",
     "publish": "",
@@ -96,6 +96,7 @@
     "@types/vscode": "^1.85.0",
     "@vscode/vsce": "^3.2.1",
     "esbuild": "catalog:",
+    "tsx": "catalog:",
     "typescript": "catalog:",
     "@openapi-lsp/core": "workspace:*",
     "zod": "catalog:"

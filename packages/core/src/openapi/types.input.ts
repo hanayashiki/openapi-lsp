@@ -5,6 +5,7 @@
 
 import { z } from "zod";
 import {
+  TaggedArray,
   TaggedRecord,
   TaggedObjectCatch,
   TaggedObject,
@@ -389,6 +390,8 @@ export namespace OpenAPIInput {
     Parameter,
   ]);
 
+  export const Parameters = TaggedArray(ParameterOrReference, "Parameters");
+
   // Request Body Object
   export const RequestBody = TaggedObjectCatch(
     {
@@ -432,6 +435,8 @@ export namespace OpenAPIInput {
   // Layer 5: Operation-level types
   // ===========================================================================
 
+  export const Responses = TaggedRecord(ResponseOrReference, "Responses");
+
   // Operation Object
   export const Operation = TaggedObjectCatch(
     {
@@ -440,9 +445,9 @@ export namespace OpenAPIInput {
       description: z.string().optional().catch(undefined),
       externalDocs: ExternalDocumentation.optional().catch(undefined),
       operationId: z.string().optional().catch(undefined),
-      parameters: z.array(ParameterOrReference).optional().catch(undefined),
+      parameters: Parameters.optional().catch(undefined),
       requestBody: RequestBodyOrReference.optional().catch(undefined),
-      responses: z.record(z.string(), ResponseOrReference).catch({}),
+      responses: Responses.catch({}),
       callbacks: z.record(z.string(), z.unknown()).optional().catch(undefined),
       deprecated: z.boolean().optional().catch(undefined),
       security: z.array(SecurityRequirement).optional().catch(undefined),
@@ -466,7 +471,7 @@ export namespace OpenAPIInput {
       patch: Operation.optional().catch(undefined),
       trace: Operation.optional().catch(undefined),
       servers: z.array(Server).optional().catch(undefined),
-      parameters: z.array(ParameterOrReference).optional().catch(undefined),
+      parameters: Parameters.optional().catch(undefined),
     },
     "PathItem",
     {}
@@ -588,6 +593,7 @@ export namespace OpenAPIInput {
   export type Server = z.infer<typeof Server>;
   export type ServerVariable = z.infer<typeof ServerVariable>;
   export type Response = z.infer<typeof Response>;
+  export type Responses = z.infer<typeof Responses>;
   export type Parameter = z.infer<typeof Parameter>;
   export type RequestBody = z.infer<typeof RequestBody>;
   export type Callback = z.infer<typeof Callback>;

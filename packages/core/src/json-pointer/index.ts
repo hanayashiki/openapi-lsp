@@ -1,3 +1,4 @@
+import { trimToIdentifier } from "../ecmascript/identifier.js";
 import { Result, ok, err } from "../result/result.js";
 
 export type JsonPointerError =
@@ -11,6 +12,8 @@ export type URLJsonPointerResult = Result<
   { url: URL; docUri: string; jsonPointer: JsonPointer },
   JsonPointerError
 >;
+
+export type DeriveNameResult = Result<string, JsonPointerError>;
 
 export type JsonPointerLoose = (string | number)[];
 
@@ -171,5 +174,36 @@ export function parseUriWithJsonPointer(
         message: "Invalid URL",
       },
     };
+  }
+}
+
+/**
+ * Derive the identifier name of node by the ref
+ * Useful to format with typescript syntax highlight.
+ */
+export function deriveIdentifierFromUri(
+  uri: string,
+  baseUri: string = "file:///"
+): DeriveNameResult {
+  const r = parseUriWithJsonPointer(uri, baseUri);
+
+  if (!r.success) {
+    return err(r.error);
+  }
+
+  const { jsonPointer, url } = r.data;
+
+  if (jsonPointer.length > 0) {
+    return ok(trimToIdentifier(jsonPointer.at(-1)!));
+  } else {
+    const lastPathSegment = decodeURIComponent(
+      url.pathname
+        .replace(/\.[^.]*$/, "") // Remove file extension
+        .replace(/\/$/, "") // Remove trailing slash
+        .split("/")
+        .at(-1) ?? ""
+    );
+
+    return ok(trimToIdentifier(lastPathSegment));
   }
 }

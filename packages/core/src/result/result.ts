@@ -41,3 +41,11 @@ export const flattenOption = <T>(option: Option<T>): T | undefined => {
   if (option.success) return option.data;
   return undefined;
 };
+
+export const unwrap = <T, E>(r: Result<T, E>): T => {
+  if (r.success) {
+    return r.data
+  }
+
+  throw new Error('Unwrap failed')
+}

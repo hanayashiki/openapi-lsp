@@ -2,8 +2,7 @@ import * as esbuild from "esbuild";
 
 const isWatch = process.argv.includes("--watch");
 
-/** @type {esbuild.BuildOptions} */
-const clientConfig = {
+const clientConfig: esbuild.BuildOptions = {
   entryPoints: ["./src/extension.ts"],
   bundle: true,
   outfile: "./dist/extension.js",
@@ -13,8 +12,7 @@ const clientConfig = {
   sourcemap: true,
 };
 
-/** @type {esbuild.BuildOptions} */
-const serverConfig = {
+const serverConfig: esbuild.BuildOptions = {
   entryPoints: ["../server/src/server.ts"],
   bundle: true,
   outfile: "./dist/server.js",
@@ -23,7 +21,7 @@ const serverConfig = {
   sourcemap: true,
 };
 
-async function build() {
+async function build(): Promise<void> {
   if (isWatch) {
     const [clientCtx, serverCtx] = await Promise.all([
       esbuild.context(clientConfig),
@@ -40,7 +38,7 @@ async function build() {
   }
 }
 
-build().catch((err) => {
+build().catch((err: unknown) => {
   console.error(err);
   process.exit(1);
 });

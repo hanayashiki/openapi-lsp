@@ -1,0 +1,5 @@
+type: object
+description: Put this to ./hide and put back
+properties:
+  id:
+    type: string

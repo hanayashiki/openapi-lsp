@@ -111,7 +111,8 @@ export class YamlDocument {
 
   /**
    * Get the YAML key at the given position, returning both the key name and its JSON pointer path.
-   * Returns null if position is not on a key.
+   * Also handles array items (the `-` marker) by returning the array index path.
+   * Returns null if position is not on a key or array item.
    */
   getKeyAtPosition(
     position: Position
@@ -124,6 +125,50 @@ export class YamlDocument {
           const [start, , end] = pair.key.range;
           if (offset >= start && offset <= end) {
             return { key, path };
+          }
+        }
+        return undefined;
+      },
+      Seq: (node, path) => {
+        // Check if cursor is on any sequence item (the `-` marker area)
+        // The `-` marker is NOT included in the item's range, so we need to
+        // calculate the logical start of each item including its marker
+        if (!node.range) return undefined;
+        const [seqStart] = node.range;
+
+        for (let i = 0; i < node.items.length; i++) {
+          const item = node.items[i] as Node;
+          if (!item?.range) continue;
+
+          const [itemContentStart, , itemEnd] = item.range;
+
+          // Calculate the logical start of this item (including the `-` marker)
+          // For item 0: starts at sequence start
+          // For item i: starts just after previous item ends
+          const logicalStart =
+            i === 0
+              ? seqStart
+              : (node.items[i - 1] as Node)?.range?.[2] ?? itemContentStart;
+
+          if (offset >= logicalStart && offset <= itemEnd) {
+            // Check if we're in the "header" area of this item (before any nested content)
+            // This is typically the `-` marker and any content on the same line
+            const itemPath = [...path, i];
+
+            // If the item is a map, check if we're before the first key
+            if (isMap(item) && item.items.length > 0) {
+              const firstPair = item.items[0];
+              if (isScalar(firstPair.key) && firstPair.key.range) {
+                const [firstKeyStart] = firstPair.key.range;
+                // If cursor is before the first key, we're on the `-` area
+                if (offset < firstKeyStart) {
+                  return { key: String(i), path: itemPath };
+                }
+              }
+            } else if (!isMap(item)) {
+              // For non-map items (scalars, etc.), the whole item is the target
+              return { key: String(i), path: itemPath };
+            }
           }
         }
         return undefined;

@@ -9,7 +9,9 @@ paths:
         $ref: "#/components/requestBodies/CreateUserBody"
       responses:
         "200":
-          description: OK
+          $ref: "#/components/responses/UserResponse"
+        "400":
+          $ref: "#/components/responses/ErrorResponse"
 components:
   requestBodies:
     CreateUserBody:
@@ -42,3 +44,46 @@ components:
               avatar:
                 type: string
                 format: binary
+  responses:
+    UserResponse:
+      description: Successful user creation
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              id:
+                type: integer
+              name:
+                type: string
+              email:
+                type: string
+        application/xml:
+          schema:
+            type: object
+            properties:
+              id:
+                type: integer
+              name:
+                type: string
+              email:
+                type: string
+    ErrorResponse:
+      description: Error response
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+              message:
+                type: string
+        application/xml:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+              message:
+                type: string

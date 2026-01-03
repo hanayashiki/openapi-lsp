@@ -1,5 +1,6 @@
 import { OpenAPI } from "@openapi-lsp/core/openapi";
-import type { SerializeOptions, SerializerContext } from "./types.js";
+import type { SerializeOptions } from "./types.js";
+import { Printer } from "./Printer.js";
 import { serializeSchemaOrRef } from "./serializeSchema.js";
 
 /**
@@ -11,25 +12,29 @@ export function serializeMediaTypeToMarkdown(
 ): string {
   const { maxDepth = 2, name } = options;
 
-  const parts: string[] = [];
+  const printer = new Printer(0);
 
-  // Get schema from content (use first media type's schema)
+  printer.writeParts("##", name, `(media type)`);
+  printer.newline();
 
   const schema = mediaType?.schema;
 
   if (schema) {
-    const ctx: SerializerContext = {
+    printer.writeParts("### Content");
+    printer.newline();
+
+    printer.write("```typescript");
+    printer.newline();
+    serializeSchemaOrRef(schema, {
       currentDepth: 0,
       maxDepth,
-      indent: 0,
-    };
+      printer,
+    });
+    printer.newline();
 
-    const serialized = serializeSchemaOrRef(schema, ctx);
-
-    parts.push(
-      `\`${name}\`\n\`\`\`typescript\n${serialized}\n\`\`\``
-    );
+    printer.write("```");
+    printer.newline();
   }
 
-  return parts.join("\n\n");
+  return printer.toString();
 }

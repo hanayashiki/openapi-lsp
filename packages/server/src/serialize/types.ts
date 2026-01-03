@@ -1,3 +1,5 @@
+import type { Printer } from "./Printer.js";
+
 // Public options for serialization
 export interface SerializeOptions {
   name?: string | null;
@@ -8,5 +10,5 @@ export interface SerializeOptions {
 export interface SerializerContext {
   currentDepth: number;
   maxDepth: number;
-  indent: number;
+  printer: Printer;
 }

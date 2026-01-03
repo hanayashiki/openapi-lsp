@@ -1,14 +1,15 @@
 import { OpenAPI } from "@openapi-lsp/core/openapi";
 import type { SerializerContext } from "./types.js";
-import { indent } from "./utils.js";
 // oxlint-disable-next-line no-cycle
 import { serializeSchemaOrRef } from "./serializeSchema.js";
+import { formatPropertyName } from "./utils.js";
 
-// Serialize object schema
+// Serialize object schema (uses 4-space indent for TypeScript)
 export function serializeObject(
   schema: OpenAPI.Schema,
   ctx: SerializerContext
-): string {
+): void {
+  const { printer } = ctx;
   const properties = schema.properties;
   const required = new Set(schema.required ?? []);
 
@@ -16,46 +17,53 @@ export function serializeObject(
     // Handle additionalProperties only
     if (schema.additionalProperties) {
       if (schema.additionalProperties === true) {
-        return "Record<string, unknown>";
+        printer.write("Record<string, unknown>");
+        return;
       }
       if (typeof schema.additionalProperties === "object") {
-        const valueType = serializeSchemaOrRef(schema.additionalProperties, {
+        printer.write("Record<string, ");
+        serializeSchemaOrRef(schema.additionalProperties, {
           ...ctx,
           currentDepth: ctx.currentDepth + 1,
         });
-        return `Record<string, ${valueType}>`;
+        printer.write(">");
+        return;
       }
     }
-    return "{}";
+    printer.write("{}");
+    return;
   }
 
-  const lines: string[] = ["{"];
+  printer.write("{");
+  printer.pushIndentation(4);
+
   const propEntries = Object.entries(properties);
 
   for (const [propName, propSchema] of propEntries) {
     const isRequired = required.has(propName);
     const optional = isRequired ? "" : "?";
-    const propType = serializeSchemaOrRef(propSchema, {
+    printer.newline().write(`${formatPropertyName(propName)}${optional}: `);
+    serializeSchemaOrRef(propSchema, {
       ...ctx,
-      indent: ctx.indent + 1,
       currentDepth: ctx.currentDepth + 1,
     });
-    lines.push(`${indent(ctx.indent + 1)}${propName}${optional}: ${propType};`);
+    printer.write(";");
   }
 
   // Handle additionalProperties
   if (schema.additionalProperties) {
-    let valueType = "unknown";
-    if (schema.additionalProperties !== true) {
-      valueType = serializeSchemaOrRef(schema.additionalProperties, {
+    printer.newline().write("[key: string]: ");
+    if (schema.additionalProperties === true) {
+      printer.write("unknown");
+    } else {
+      serializeSchemaOrRef(schema.additionalProperties, {
         ...ctx,
-        indent: ctx.indent + 1,
         currentDepth: ctx.currentDepth + 1,
       });
     }
-    lines.push(`${indent(ctx.indent + 1)}[key: string]: ${valueType};`);
+    printer.write(";");
   }
 
-  lines.push(`${indent(ctx.indent)}}`);
-  return lines.join("\n");
+  printer.popIndentation();
+  printer.newline().write("}");
 }

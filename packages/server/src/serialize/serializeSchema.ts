@@ -12,21 +12,27 @@ import { serializeComposition } from "./serializeComposition.js";
 function serializeSchema(
   schema: OpenAPI.Schema,
   ctx: SerializerContext
-): string {
+): void {
+  const { printer } = ctx;
+
   // Depth limit reached
   if (ctx.currentDepth > ctx.maxDepth) {
-    return "...";
+    printer.write("...");
+    return;
   }
 
   // Handle compositions first (they may not have type)
   if (schema.allOf && schema.allOf.length > 0) {
-    return serializeComposition(schema.allOf, "&", ctx);
+    serializeComposition(schema.allOf, "&", ctx);
+    return;
   }
   if (schema.oneOf && schema.oneOf.length > 0) {
-    return serializeComposition(schema.oneOf, "|", ctx);
+    serializeComposition(schema.oneOf, "|", ctx);
+    return;
   }
   if (schema.anyOf && schema.anyOf.length > 0) {
-    return serializeComposition(schema.anyOf, "|", ctx);
+    serializeComposition(schema.anyOf, "|", ctx);
+    return;
   }
 
   // Infer type from structure if not explicit
@@ -36,21 +42,25 @@ function serializeSchema(
 
   switch (type) {
     case "object":
-      return serializeObject(schema, ctx);
+      serializeObject(schema, ctx);
+      return;
     case "array":
-      return serializeArray(schema, ctx);
+      serializeArray(schema, ctx);
+      return;
     case "string":
     case "integer":
     case "number":
     case "boolean":
     case "null":
-      return serializePrimitive(schema);
+      serializePrimitive(schema, ctx);
+      return;
     default:
       // Handle enum without explicit type
       if (schema.enum) {
-        return serializePrimitive(schema);
+        serializePrimitive(schema, ctx);
+        return;
       }
-      return "unknown";
+      printer.write("unknown");
   }
 }
 
@@ -58,9 +68,10 @@ function serializeSchema(
 export function serializeSchemaOrRef(
   schema: OpenAPI.Schema | OpenAPI.Reference,
   ctx: SerializerContext
-): string {
+): void {
   if (isReference(schema)) {
-    return serializeRef(schema);
+    serializeRef(schema, ctx);
+    return;
   }
-  return serializeSchema(schema, ctx);
+  serializeSchema(schema, ctx);
 }

@@ -5,3 +5,4 @@ catalog:
   typescript: ^5.9.3
   zod: ^4.2.1
   esbuild: ^0.27.2
+  tsx: ^4.19.2

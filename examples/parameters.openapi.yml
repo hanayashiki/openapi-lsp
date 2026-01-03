@@ -1,0 +1,191 @@
+openapi: "3.0.3"
+info:
+  title: Parameters Example
+  version: "1.0"
+paths:
+  /users/{userId}/posts/{postId}:
+    get:
+      summary: Get a specific post by a user
+      parameters:
+        # Path parameters
+        - name: userId
+          in: path
+          required: true
+          description: The unique identifier of the user
+          schema:
+            type: string
+            format: uuid
+        - name: postId
+          in: path
+          required: true
+          description: The unique identifier of the post
+          schema:
+            type: integer
+            minimum: 1
+        # Query parameters
+        - name: include
+          in: query
+          description: Related resources to include
+          schema:
+            type: array
+            items:
+              type: string
+              enum:
+                - comments
+                - author
+                - tags
+          style: form
+          explode: true
+        - name: fields
+          in: query
+          description: Specific fields to return
+          schema:
+            type: string
+        - name: page
+          in: query
+          description: Page number for pagination
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: limit
+          in: query
+          description: Number of items per page
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+        # Header parameters
+        - name: X-Request-ID
+          in: header
+          description: Unique request identifier for tracing
+          schema:
+            type: string
+            format: uuid
+        - name: Accept-Language
+          in: header
+          description: Preferred language for response
+          schema:
+            type: string
+            default: en-US
+            enum:
+              - en-US
+              - es-ES
+              - fr-FR
+              - de-DE
+        - name: X-API-Version
+          in: header
+          description: API version to use
+          schema:
+            type: string
+            pattern: "^v[0-9]+$"
+        # Cookie parameters
+        - name: session_id
+          in: cookie
+          description: Session identifier
+          schema:
+            type: string
+        - name: preferences
+          in: cookie
+          description: User preferences JSON
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Post"
+        "404":
+          description: Post not found
+  /search:
+    get:
+      summary: Search across resources
+      parameters:
+        - name: q
+          in: query
+          required: true
+          description: Search query string
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 500
+        - name: type
+          in: query
+          description: Resource type to search
+          schema:
+            type: string
+            enum:
+              - users
+              - posts
+              - comments
+        - name: sort
+          in: query
+          description: Sort order
+          schema:
+            type: string
+            enum:
+              - relevance
+              - date
+              - popularity
+            default: relevance
+        - name: Authorization
+          in: header
+          required: true
+          description: Bearer token for authentication
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+components:
+  schemas:
+    Post:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        content:
+          type: string
+        authorId:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+        tags:
+          type: array
+          items:
+            type: string
+  parameters:
+    PaginationPage:
+      name: page
+      in: query
+      description: Page number
+      schema:
+        type: integer
+        default: 1
+    PaginationLimit:
+      name: limit
+      in: query
+      description: Items per page
+      schema:
+        type: integer
+        default: 20
+    CommonRequestId:
+      name: X-Request-ID
+      in: header
+      description: Request tracking ID
+      schema:
+        type: string
+        format: uuid

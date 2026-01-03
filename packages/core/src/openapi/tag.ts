@@ -16,7 +16,9 @@ export const OpenAPITag = z.enum([
   "Server",
   "ServerVariable",
   "Response",
+  "Responses",
   "Parameter",
+  "Parameters",
   "RequestBody",
   "Callback",
   "SecurityRequirement",
@@ -78,6 +80,16 @@ export const TaggedRecord = <T extends core.SomeType>(
   tag: OpenAPITag
 ): ZodRecord<ZodString, T> => {
   return z.record(z.string(), value).transform((value) => {
+    addTag(value, tag);
+    return value;
+  }) as never;
+};
+
+export const TaggedArray = <T extends core.SomeType>(
+  item: T,
+  tag: OpenAPITag
+): z.ZodArray<T> => {
+  return z.array(item).transform((value) => {
     addTag(value, tag);
     return value;
   }) as never;

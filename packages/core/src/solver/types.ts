@@ -30,11 +30,15 @@ export type LocalShape =
 
 /**
  * Equivalence class: nodes connected via $ref.
+ * Each class has at most one "value" node (non-ref node) which is the
+ * ultimate target of all refs in the class.
  */
 export type Class = {
   id: ClassId;
   nodes: Set<NodeId>;
   nominal: NominalId | null;
+  /** The non-ref node in this class, if any. Null for external-only classes. */
+  valueNode: NodeId | null;
 };
 
 /**
@@ -94,6 +98,15 @@ export interface SolveResult {
    * @throws Error if the node was not in the input
    */
   getCanonicalNominal(node: NodeId): NominalId | null;
+
+  /**
+   * Get the value node (non-ref node) for a node's equivalence class.
+   * This is the ultimate target of all refs in the class - the node
+   * that contains the actual value rather than a $ref pointer.
+   * Returns null if the class has no value node (external-only refs).
+   * @throws Error if the node was not in the input
+   */
+  getValueNodeId(node: NodeId): NodeId | null;
 
   /**
    * Get nominals for external refs (nodes referenced but not in input).

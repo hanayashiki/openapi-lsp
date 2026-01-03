@@ -11,9 +11,9 @@ import {
   isNodeInDocument,
 } from "@openapi-lsp/core/json-pointer";
 import { NodeId, NominalId } from "@openapi-lsp/core/solver";
-import { visitFragment, VisitorFn } from "./Visitor.js";
+import { visitFragment, visitFragmentArray, Visitor } from "./Visitor.js";
 import { ServerDocument } from "./ServerDocument.js";
-import { isMap } from "yaml";
+import { isMap, isSeq } from "yaml";
 import z from "zod";
 
 // ----- Extractors that gather info for `Solver` -----
@@ -77,9 +77,6 @@ export function collectNominalsFromEntryPoint(
 
   // Navigate to AST node
   const astNode = doc.yaml.getNodeAtPath(basePath);
-  if (!astNode || !isMap(astNode)) {
-    return undefined;
-  }
 
   // Get raw value
   const rawValue = doc.yaml.getValueAtPath(basePath);
@@ -96,13 +93,13 @@ export function collectNominalsFromEntryPoint(
 
   // Visit to extract nominals from tags and References
   if (nominal) {
-    visitFragment(taggedResult.data, astNode, basePath, {
-      "*": (({ ast, openapiNode }) => {
+    const visitorCallbacks: Visitor = {
+      "*": ({ ast, openapiNode }) => {
         const tag = getOpenAPITag(openapiNode);
         if (tag && tag !== "Reference") {
           addNominal(localNominals, uriWithJsonPointerLoose(uri, ast.path), tag);
         }
-      }) satisfies VisitorFn<object>,
+      },
       Reference: ({ openapiNode }) => {
         const targetResult = parseUriWithJsonPointer(openapiNode.$ref, uri);
         if (!targetResult.success) return;
@@ -117,7 +114,15 @@ export function collectNominalsFromEntryPoint(
           }
         }
       },
-    });
+    };
+
+    if (astNode && isMap(astNode)) {
+      visitFragment(taggedResult.data, astNode, basePath, visitorCallbacks);
+    } else if (astNode && isSeq(astNode)) {
+      visitFragmentArray(taggedResult.data, astNode, basePath, visitorCallbacks);
+    } else {
+      return undefined;
+    }
   }
 
   return { outgoingNominals, localNominals };

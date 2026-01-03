@@ -4,6 +4,7 @@ import {
   Node,
   Scalar,
   YAMLMap,
+  YAMLSeq,
   isMap,
   isScalar,
   isNode,
@@ -18,7 +19,7 @@ export interface VisitInput {
 
 export interface AstContext {
   path: SpecDocumentPath;
-  astNode: YAMLMap;
+  astNode: YAMLMap | YAMLSeq;
   keyNode?: Scalar;
 }
 
@@ -63,7 +64,9 @@ export interface Visitor {
   Header?: VisitorFn<OpenAPI.Header>;
   Link?: VisitorFn<OpenAPI.Link>;
   Response?: VisitorFn<OpenAPI.Response>;
+  Responses?: VisitorFn<OpenAPI.Responses>;
   Parameter?: VisitorFn<OpenAPI.Parameter>;
+  Parameters?: VisitorFn<OpenAPI.Parameters>;
   RequestBody?: VisitorFn<OpenAPI.RequestBody>;
   SecurityScheme?: VisitorFn<OpenAPI.SecurityScheme>;
 
@@ -140,6 +143,30 @@ export const visitFragment = (
   });
 };
 
+/**
+ * Visit a fragment of an OpenAPI document starting from an array node.
+ * Used for array types like Parameters where the entry point is a sequence.
+ *
+ * @param openapiArray - The parsed OpenAPI array (e.g., Parameters)
+ * @param astNode - The YAML AST sequence node corresponding to the array
+ * @param basePath - The JSON pointer path prefix for the fragment
+ * @param visitor - The visitor callbacks
+ */
+export const visitFragmentArray = (
+  openapiArray: object[],
+  astNode: YAMLSeq,
+  basePath: SpecDocumentPath,
+  visitor: Visitor
+) => {
+  _visit({
+    currentPath: basePath,
+    currentAstNode: astNode,
+    currentOpenAPINode: openapiArray,
+    visitor,
+    currentLink: undefined,
+  });
+};
+
 const _visit = ({
   currentPath,
   currentAstNode,
@@ -167,7 +194,8 @@ const _visit = ({
 
       if (nextOpenAPINode && typeof nextOpenAPINode === "object") {
         const tag = getOpenAPITag(nextOpenAPINode);
-        if (tag && isMap(nextAstNode)) {
+        // Call visitor for tagged nodes (both maps and sequences)
+        if (tag && (isMap(nextAstNode) || isSeq(nextAstNode))) {
           getVisitorsForTag(tag).forEach((visitor) => {
             visitor({
               openapiNode: nextOpenAPINode as never,

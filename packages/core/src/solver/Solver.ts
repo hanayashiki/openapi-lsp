@@ -84,6 +84,13 @@ class SolveResultImpl implements SolveResult {
     return this.classes.get(classId)?.nominal ?? null;
   }
 
+  getValueNodeId(node: NodeId): NodeId | null {
+    this.assertNodeExists(node);
+    const classId = this.nodeToClass.get(node);
+    if (classId === undefined) return null;
+    return this.classes.get(classId)?.valueNode ?? null;
+  }
+
   getOutgoingNominals(): Map<NodeId, NominalId> {
     return new Map(this.outgoingNominalsMap);
   }
@@ -186,14 +193,15 @@ export class Solver {
 
     for (const [, nodeSet] of components) {
       const classId = classIdCounter++;
+
       const cls: Class = {
         id: classId,
         nodes: nodeSet,
         nominal: null,
+        valueNode: null,
       };
 
       // Check for nominal conflicts and assign nominal
-      // Collect all nominals from both local (ctx.nominals) and incoming (ctx.incomingNominals)
       let firstNominal: { node: NodeId; nominal: NominalId } | null = null;
 
       const tryAssignNominal = (node: NodeId, nominal: NominalId) => {
@@ -219,6 +227,18 @@ export class Solver {
 
       for (const node of nodeSet) {
         ctx.nodeToClass.set(node, classId);
+
+        // Find the value node (non-ref node) in this class
+        // There can be at most one since refs form a forest pointing to a single value
+        const shape = nodes.get(node);
+        if (shape && shape.kind !== "ref") {
+          if (cls.valueNode !== null) {
+            throw new Error(
+              `Invariant violation: equivalence class ${classId} has multiple value nodes: "${cls.valueNode}" and "${node}"`
+            );
+          }
+          cls.valueNode = node;
+        }
 
         // Check all nominals (unified from local tags, refs, and upstream SCCs)
         const nominals = ctx.nominals.get(node);

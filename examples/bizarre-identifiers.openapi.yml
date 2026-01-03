@@ -1,0 +1,213 @@
+openapi: 3.0.3
+info:
+  title: Bizarre Identifier Examples
+  description: |
+    Test cases for deriveIdentifierFromUri with valid and invalid ECMAScript identifiers.
+    These demonstrate how trimToIdentifier transforms names into valid identifiers.
+  version: 1.0.0
+
+paths:
+  /test:
+    get:
+      summary: Test endpoint
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidIdentifier"
+        "5XX":
+          description: Failed
+          content:
+            application/json:
+              schema:
+                $ref: "./bizzare-identifiers/ಠ_ಠ.yml"
+
+components:
+  schemas:
+    # ==========================================================================
+    # VALID IDENTIFIERS (no transformation needed)
+    # ==========================================================================
+
+    # Standard ASCII
+    ValidIdentifier:
+      type: string
+    _underscoreStart:
+      type: string
+    $dollarStart:
+      type: string
+    camelCase:
+      type: string
+    PascalCase:
+      type: string
+    snake_case:
+      type: string
+    SCREAMING_SNAKE:
+      type: string
+    with123Numbers:
+      type: string
+    _123startsWithUnderscore:
+      type: string
+
+    # Unicode identifiers (valid in ES2015+)
+    π:
+      type: number
+      description: Greek pi - valid identifier start
+    变量:
+      type: string
+      description: Chinese "variable" - valid identifier
+    αβγδ:
+      type: string
+      description: Greek letters - valid identifier
+    café:
+      type: string
+      description: Latin with diacritics - valid identifier
+    日本語:
+      type: string
+      description: Japanese - valid identifier
+    émoji:
+      type: string
+      description: e with accent - valid identifier
+
+    # ==========================================================================
+    # INVALID IDENTIFIERS (require transformation)
+    # ==========================================================================
+
+    # Starts with digit → prefixed with _
+    123startsWithNumber:
+      type: string
+      description: "Becomes: _123startsWithNumber"
+    0x1F:
+      type: string
+      description: "Becomes: _0x1F"
+    42:
+      type: integer
+      description: "Becomes: _42"
+
+    # Contains invalid characters → replaced with _
+    kebab-case:
+      type: string
+      description: "Becomes: kebab_case"
+    dot.notation:
+      type: string
+      description: "Becomes: dot_notation"
+    space separated:
+      type: string
+      description: "Becomes: space_separated"
+    with@symbol:
+      type: string
+      description: "Becomes: with_symbol"
+    has#hash:
+      type: string
+      description: "Becomes: has_hash"
+    percent%sign:
+      type: string
+      description: "Becomes: percent_sign"
+    ampersand&here:
+      type: string
+      description: "Becomes: ampersand_here"
+    asterisk*wild:
+      type: string
+      description: "Becomes: asterisk_wild"
+    plus+more:
+      type: string
+      description: "Becomes: plus_more"
+    equals=value:
+      type: string
+      description: "Becomes: equals_value"
+    pipe|or:
+      type: string
+      description: "Becomes: pipe_or"
+    backslash\path:
+      type: string
+      description: "Becomes: backslash_path"
+    colon:separated:
+      type: string
+      description: "Becomes: colon_separated"
+    semi;colon:
+      type: string
+      description: "Becomes: semi_colon"
+    question?mark:
+      type: string
+      description: "Becomes: question_mark"
+    exclaim!ation:
+      type: string
+      description: "Becomes: exclaim_ation"
+
+    # Multiple invalid characters in a row
+    foo--bar:
+      type: string
+      description: "Becomes: foo__bar"
+    a...b:
+      type: string
+      description: "Becomes: a___b"
+    --dashes--:
+      type: string
+      description: "Becomes: __dashes__"
+
+    # Starts with invalid character
+    -startsWithDash:
+      type: string
+      description: "Becomes: _startsWithDash"
+    .startsWithDot:
+      type: string
+      description: "Becomes: _startsWithDot"
+    @startsWithAt:
+      type: string
+      description: "Becomes: _startsWithAt"
+
+    # All invalid characters
+    "---":
+      type: string
+      description: "Becomes: ___"
+    "...":
+      type: string
+      description: "Becomes: ___"
+    "@#$%":
+      type: string
+      description: "Becomes: $__ ($ is valid, others replaced)"
+
+    # Empty-ish (edge cases)
+    " ":
+      type: string
+      description: "Single space becomes: _"
+
+    # URL-encoded characters (common in refs)
+    hello%20world:
+      type: string
+      description: "URL-encoded space, becomes: hello_world after decoding"
+    path%2Fwith%2Fslashes:
+      type: string
+      description: "URL-encoded slashes"
+
+    # Mixed valid/invalid
+    MyClass<T>:
+      type: string
+      description: "Becomes: MyClass_T_"
+    Array[0]:
+      type: string
+      description: "Becomes: Array_0_"
+    "func()":
+      type: string
+      description: "Becomes: func__"
+    "{braces}":
+      type: string
+      description: "Becomes: _braces_"
+    "(parens)":
+      type: string
+      description: "Becomes: _parens_"
+
+    # Real-world bizarre examples
+    application/json:
+      type: string
+      description: "Media type - becomes: application_json"
+    text/plain; charset=utf-8:
+      type: string
+      description: "Media type with params - becomes: text_plain__charset_utf_8"
+    /api/v1/users:
+      type: string
+      description: "Path - becomes: _api_v1_users"
+    https://example.com:
+      type: string
+      description: "URL - becomes: https___example_com"

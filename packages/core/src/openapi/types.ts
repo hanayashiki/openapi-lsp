@@ -7,7 +7,13 @@
  */
 
 import { z } from "zod";
-import { setOpenAPITag, TaggedObject, TaggedRecord, TaggedReference } from "./tag.js";
+import {
+  setOpenAPITag,
+  TaggedArray,
+  TaggedObject,
+  TaggedRecord,
+  TaggedReference,
+} from "./tag.js";
 
 // ------------------------------------------------------------------------------
 // OpenAPI Namespace
@@ -350,7 +356,12 @@ export namespace OpenAPI {
     "Parameter"
   );
 
-  const ParameterOrReference = z.union([TaggedReference("Parameter"), Parameter]);
+  const ParameterOrReference = z.union([
+    TaggedReference("Parameter"),
+    Parameter,
+  ]);
+
+  export const Parameters = TaggedArray(ParameterOrReference, "Parameters");
 
   // Request Body Object
   export const RequestBody = TaggedObject(
@@ -362,7 +373,10 @@ export namespace OpenAPI {
     "RequestBody"
   );
 
-  const RequestBodyOrReference = z.union([TaggedReference("RequestBody"), RequestBody]);
+  const RequestBodyOrReference = z.union([
+    TaggedReference("RequestBody"),
+    RequestBody,
+  ]);
 
   // Security Scheme Object
   export const SecurityScheme = TaggedObject(
@@ -386,11 +400,16 @@ export namespace OpenAPI {
     "SecurityScheme"
   );
 
-  const SecuritySchemeOrReference = z.union([TaggedReference("SecurityScheme"), SecurityScheme]);
+  const SecuritySchemeOrReference = z.union([
+    TaggedReference("SecurityScheme"),
+    SecurityScheme,
+  ]);
 
   // ===========================================================================
   // Layer 5: Operation-level types
   // ===========================================================================
+
+  export const Responses = TaggedRecord(ResponseOrReference, "Responses");
 
   // Operation Object
   export const Operation = TaggedObject(
@@ -400,9 +419,9 @@ export namespace OpenAPI {
       description: z.string().optional(),
       externalDocs: ExternalDocumentation.optional(),
       operationId: z.string().optional(),
-      parameters: z.array(ParameterOrReference).optional(),
+      parameters: Parameters.optional(),
       requestBody: RequestBodyOrReference.optional(),
-      responses: z.record(z.string(), ResponseOrReference),
+      responses: Responses,
       // callbacks defined below after PathItem
       callbacks: z.record(z.string(), z.unknown()).optional(),
       deprecated: z.boolean().optional(),
@@ -426,7 +445,7 @@ export namespace OpenAPI {
       patch: Operation.optional(),
       trace: Operation.optional(),
       servers: z.array(Server).optional(),
-      parameters: z.array(ParameterOrReference).optional(),
+      parameters: Parameters.optional(),
     },
     "PathItem"
   );
@@ -519,7 +538,9 @@ export namespace OpenAPI {
   export type Server = z.infer<typeof Server>;
   export type ServerVariable = z.infer<typeof ServerVariable>;
   export type Response = z.infer<typeof Response>;
+  export type Responses = z.infer<typeof Responses>;
   export type Parameter = z.infer<typeof Parameter>;
+  export type Parameters = z.infer<typeof Parameters>;
   export type RequestBody = z.infer<typeof RequestBody>;
   export type Callback = z.infer<typeof Callback>;
   export type SecurityRequirement = z.infer<typeof SecurityRequirement>;

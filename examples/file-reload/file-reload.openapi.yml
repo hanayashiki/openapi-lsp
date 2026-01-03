@@ -1,0 +1,19 @@
+openapi: 3.0.3
+info:
+  title: Bizarre Identifier Examples
+  description: |
+    Test cases for deriveIdentifierFromUri with valid and invalid ECMAScript identifiers.
+    These demonstrate how trimToIdentifier transforms names into valid identifiers.
+  version: 1.0.0
+
+paths:
+  /test:
+    get:
+      summary: Test endpoint
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "./reloading.yml"

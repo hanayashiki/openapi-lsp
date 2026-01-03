@@ -1,15 +1,21 @@
 import { OpenAPI } from "@openapi-lsp/core/openapi";
+import type { SerializerContext } from "./types.js";
 
 // Serialize primitive types (string, number, integer, boolean, null)
-export function serializePrimitive(schema: OpenAPI.Schema): string {
+export function serializePrimitive(
+  schema: OpenAPI.Schema,
+  ctx: SerializerContext
+): void {
   const { type, format, nullable } = schema;
+  const { printer } = ctx;
 
   // Handle enum as string literal union
   if (schema.enum) {
     const enumType = schema.enum
       .map((v) => (typeof v === "string" ? `"${v}"` : String(v)))
       .join(" | ");
-    return nullable ? `(${enumType}) | null` : enumType;
+    printer.write(nullable ? `(${enumType}) | null` : enumType);
+    return;
   }
 
   let baseType: string;
@@ -28,10 +34,11 @@ export function serializePrimitive(schema: OpenAPI.Schema): string {
       baseType = "boolean";
       break;
     case "null":
-      return "null";
+      printer.write("null");
+      return;
     default:
       baseType = "unknown";
   }
 
-  return nullable ? `${baseType} | null` : baseType;
+  printer.write(nullable ? `${baseType} | null` : baseType);
 }

@@ -1,9 +1,10 @@
 .vscode/**
 src/**
 out/**
+scripts/**
 node_modules/**
 *.tsbuildinfo
-esbuild.mjs
 tsconfig.json
-**/*.ts
 **/*.map
+**/*.vsix
+.DS_Store

@@ -1,5 +1,6 @@
 import { OpenAPI } from "@openapi-lsp/core/openapi";
-import type { SerializeOptions, SerializerContext } from "./types.js";
+import type { SerializeOptions } from "./types.js";
+import { Printer } from "./Printer.js";
 import { serializeSchemaOrRef } from "./serializeSchema.js";
 
 /**
@@ -11,41 +12,59 @@ export function serializeRequestBodyToMarkdown(
 ): string {
   const { maxDepth = 2, name } = options;
 
-  const parts: string[] = [];
+  const printer = new Printer(0);
 
-  // Add description if present
+  printer.writeParts("##", name, `(requestBody)`);
+  printer.newline();
+
   if (requestBody.description) {
-    parts.push(requestBody.description);
+    printer.writeParts("### Description");
+    printer.newline();
+    printer.writeParts(requestBody.description);
+    printer.newline();
   }
 
-  // Add required status
   if (requestBody.required) {
-    parts.push("**Required**");
+    printer.writeParts("**Required**");
+    printer.newline();
   }
 
-  // Get schema from content (use first media type's schema)
   const content = requestBody.content;
-  const mediaTypes = Object.keys(content);
+  if (content) {
+    const mediaTypes = Object.keys(content);
 
-  // Show each media type with its schema
-  for (const mediaType of mediaTypes) {
-    const mediaTypeObj = content[mediaType];
-    const schema = mediaTypeObj?.schema;
+    printer.writeParts(
+      mediaTypes.length >= 2
+        ? "### Contents"
+        : mediaTypes.length === 1
+        ? "### Content"
+        : ""
+    );
 
-    if (schema) {
-      const ctx: SerializerContext = {
-        currentDepth: 0,
-        maxDepth,
-        indent: 0,
-      };
+    printer.newline();
 
-      const serialized = serializeSchemaOrRef(schema, ctx);
-      const nameOrInline = name ? `type ${name} = ` : "";
-      parts.push(
-        `\`${mediaType}\`\n\`\`\`typescript\n${nameOrInline}${serialized}\n\`\`\``
-      );
+    for (const mediaType of mediaTypes) {
+      const mediaTypeObj = content[mediaType];
+      const schema = mediaTypeObj?.schema;
+
+      printer.write(`\`${mediaType}\``);
+      printer.newline();
+
+      if (schema) {
+        printer.write("```typescript");
+        printer.newline();
+        serializeSchemaOrRef(schema, {
+          currentDepth: 0,
+          maxDepth,
+          printer,
+        });
+        printer.newline();
+
+        printer.write("```");
+        printer.newline();
+      }
     }
   }
 
-  return parts.join("\n\n");
+  return printer.toString();
 }

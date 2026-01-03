@@ -14,6 +14,7 @@ import {
 } from "@openapi-lsp/core/json-pointer";
 import { Position } from "vscode-languageserver-textdocument";
 import { DefinitionLink } from "vscode-languageserver";
+import { md5 } from "js-md5";
 
 export class DocumentReferenceManager {
   loader: CacheLoader<
@@ -58,8 +59,10 @@ export class DocumentReferenceManager {
             ),
           };
           // Hash based on document content
-          const hash = document.yaml.getHash();
-          return { value, hash };
+          return {
+            value,
+            hash: DocumentReferenceManager.hashReferences(value),
+          };
         } else {
           return {
             value: { uri, references: [] },
@@ -68,6 +71,21 @@ export class DocumentReferenceManager {
         }
       }
     );
+  }
+
+  static hashReferences(references: DocumentReferences): string {
+    const hasher = md5.create();
+    for (const r of references.references) {
+      hasher.update(r.ref);
+      hasher.update("\0");
+
+      if (!r.resolved.success) {
+        hasher.update(r.resolved.error.type);
+        hasher.update("\0");
+      }
+    }
+
+    return hasher.hex();
   }
 
   getDocumentReferences = async (uri: string): Promise<DocumentReferences> => {

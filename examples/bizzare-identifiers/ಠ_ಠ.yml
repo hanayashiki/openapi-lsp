@@ -1,0 +1,5 @@
+type: object
+description: Node A references Node B
+properties:
+  id:
+    type: string

@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@openapi-lsp/core": "workspace:*",
+    "dedent": "^1.7.1",
     "js-md5": "^0.8.3",
     "minimatch": "^10.0.1",
     "vscode-languageserver": "^9.0.1",
