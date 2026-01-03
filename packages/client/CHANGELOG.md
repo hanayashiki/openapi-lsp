@@ -1,3 +1,7 @@
+# 0.1.4
+
+1. Improved hovering
+
 # 0.0.5
 
 1. Support cross-file definitions.
