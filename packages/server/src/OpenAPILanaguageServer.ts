@@ -160,8 +160,6 @@ export class OpenAPILanguageServer {
       }
     }
 
-    const name: string = unwrap(deriveIdentifierFromUri(targetNodeId)); // We create the URI from ourselve, cannot fail.
-
     // Shared logic: get analysis, nominal, value, and serialize
     try {
       const dc = await this.analysisManager.documentConnectivityLoader.use([
@@ -207,6 +205,11 @@ export class OpenAPILanguageServer {
           groupResult.solveResult
         );
       }
+
+      const name: string =
+        nominal === "PathItem"
+          ? String(targetPath.at(-1) ?? "_")
+          : unwrap(deriveIdentifierFromUri(targetNodeId)); // We create the URI from ourselve, cannot fail.
 
       // Serialize: use nominal serializer if available, else literal fallback
       const markdown = nominal
