@@ -85,6 +85,11 @@ export namespace OpenAPI {
     "ServerVariable"
   );
 
+  export const ServerVariables = TaggedRecord(
+    ServerVariable,
+    "ServerVariables"
+  );
+
   // OAuth Flow Object
   export const OAuthFlow = TaggedObject(
     {
@@ -139,10 +144,12 @@ export namespace OpenAPI {
     {
       url: z.string(),
       description: z.string().optional(),
-      variables: z.record(z.string(), ServerVariable).optional(),
+      variables: ServerVariables.optional(),
     },
     "Server"
   );
+
+  export const Servers = TaggedArray(Server, "Servers");
 
   // ===========================================================================
   // Layer 3: Schema (recursive - uses z.lazy)
@@ -255,6 +262,9 @@ export namespace OpenAPI {
   const SchemaOrReference = z.union([TaggedReference("Schema"), Schema]);
   const ExampleOrReference = z.union([TaggedReference("Example"), Example]);
 
+  // Examples record (used in MediaType, Header, Parameter)
+  export const Examples = TaggedRecord(ExampleOrReference, "Examples");
+
   // Encoding Object
   export const Encoding = TaggedObject(
     {
@@ -270,13 +280,15 @@ export namespace OpenAPI {
     "Encoding"
   );
 
+  export const Encodings = TaggedRecord(Encoding, "Encodings");
+
   // MediaType Object
   export const MediaType = TaggedObject(
     {
       schema: SchemaOrReference.optional(),
       example: z.unknown().optional(),
-      examples: z.record(z.string(), ExampleOrReference).optional(),
-      encoding: z.record(z.string(), Encoding).optional(),
+      examples: Examples.optional(),
+      encoding: Encodings.optional(),
     },
     "MediaType"
   );
@@ -295,13 +307,16 @@ export namespace OpenAPI {
       allowReserved: z.boolean().optional(),
       schema: SchemaOrReference.optional(),
       example: z.unknown().optional(),
-      examples: z.record(z.string(), ExampleOrReference).optional(),
+      examples: Examples.optional(),
       content: Content.optional(),
     },
     "Header"
   );
 
   const HeaderOrReference = z.union([TaggedReference("Header"), Header]);
+
+  // Headers record (used in Response, Components)
+  export const Headers = TaggedRecord(HeaderOrReference, "Headers");
 
   // Link Object
   export const Link = TaggedObject(
@@ -318,13 +333,16 @@ export namespace OpenAPI {
 
   const LinkOrReference = z.union([TaggedReference("Link"), Link]);
 
+  // Links record (used in Response, Components)
+  export const Links = TaggedRecord(LinkOrReference, "Links");
+
   // Response Object
   export const Response = TaggedObject(
     {
       description: z.string(),
-      headers: z.record(z.string(), HeaderOrReference).optional(),
+      headers: Headers.optional(),
       content: Content.optional(),
-      links: z.record(z.string(), LinkOrReference).optional(),
+      links: Links.optional(),
     },
     "Response"
   );
@@ -350,7 +368,7 @@ export namespace OpenAPI {
       allowReserved: z.boolean().optional(),
       schema: SchemaOrReference.optional(),
       example: z.unknown().optional(),
-      examples: z.record(z.string(), ExampleOrReference).optional(),
+      examples: Examples.optional(),
       content: Content.optional(),
     },
     "Parameter"
@@ -405,6 +423,28 @@ export namespace OpenAPI {
     SecurityScheme,
   ]);
 
+  // Tagged records for Components fields
+  export const Schemas = TaggedRecord(SchemaOrReference, "Schemas");
+  // Note: Examples is defined earlier (used in MediaType, Header, Parameter)
+  // Note: Headers is defined earlier (used in Response)
+  // Note: Links is defined earlier (used in Response)
+  export const ComponentResponses = TaggedRecord(
+    ResponseOrReference,
+    "ComponentResponses"
+  );
+  export const ComponentParameters = TaggedRecord(
+    ParameterOrReference,
+    "ComponentParameters"
+  );
+  export const RequestBodies = TaggedRecord(
+    RequestBodyOrReference,
+    "RequestBodies"
+  );
+  export const SecuritySchemes = TaggedRecord(
+    SecuritySchemeOrReference,
+    "SecuritySchemes"
+  );
+
   // ===========================================================================
   // Layer 5: Operation-level types
   // ===========================================================================
@@ -426,7 +466,7 @@ export namespace OpenAPI {
       callbacks: z.record(z.string(), z.unknown()).optional(),
       deprecated: z.boolean().optional(),
       security: z.array(SecurityRequirement).optional(),
-      servers: z.array(Server).optional(),
+      servers: Servers.optional(),
     },
     "Operation"
   );
@@ -444,7 +484,7 @@ export namespace OpenAPI {
       head: Operation.optional(),
       patch: Operation.optional(),
       trace: Operation.optional(),
-      servers: z.array(Server).optional(),
+      servers: Servers.optional(),
       parameters: Parameters.optional(),
     },
     "PathItem"
@@ -452,10 +492,15 @@ export namespace OpenAPI {
 
   const PathItemOrReference = z.union([TaggedReference("PathItem"), PathItem]);
 
+  // Paths record (used in Document)
+  export const Paths = TaggedRecord(PathItemOrReference, "Paths");
+
   // Callback Object
-  export const Callback = z.record(z.string(), PathItemOrReference);
+  export const Callback = TaggedRecord(PathItemOrReference, "Callback");
 
   const CallbackOrReference = z.union([TaggedReference("Callback"), Callback]);
+
+  export const Callbacks = TaggedRecord(CallbackOrReference, "Callbacks");
 
   // ===========================================================================
   // Layer 6: Components
@@ -464,17 +509,15 @@ export namespace OpenAPI {
   // Components Object
   export const Components = TaggedObject(
     {
-      schemas: z.record(z.string(), SchemaOrReference).optional(),
-      responses: z.record(z.string(), ResponseOrReference).optional(),
-      parameters: z.record(z.string(), ParameterOrReference).optional(),
-      examples: z.record(z.string(), ExampleOrReference).optional(),
-      requestBodies: z.record(z.string(), RequestBodyOrReference).optional(),
-      headers: z.record(z.string(), HeaderOrReference).optional(),
-      securitySchemes: z
-        .record(z.string(), SecuritySchemeOrReference)
-        .optional(),
-      links: z.record(z.string(), LinkOrReference).optional(),
-      callbacks: z.record(z.string(), CallbackOrReference).optional(),
+      schemas: Schemas.optional(),
+      responses: ComponentResponses.optional(),
+      parameters: ComponentParameters.optional(),
+      examples: Examples.optional(),
+      requestBodies: RequestBodies.optional(),
+      headers: Headers.optional(),
+      securitySchemes: SecuritySchemes.optional(),
+      links: Links.optional(),
+      callbacks: Callbacks.optional(),
     },
     "Components"
   );
@@ -492,6 +535,9 @@ export namespace OpenAPI {
     },
     "Tag"
   );
+
+  // Tags
+  export const TagArray = TaggedArray(Tag, "TagArray");
 
   // Info Object
   export const Info = TaggedObject(
@@ -511,11 +557,11 @@ export namespace OpenAPI {
     {
       openapi: z.string(),
       info: Info,
-      servers: z.array(Server).optional(),
-      paths: z.record(z.string(), PathItemOrReference).optional(),
+      servers: Servers.optional(),
+      paths: Paths.optional(),
       components: Components.optional(),
       security: z.array(SecurityRequirement).optional(),
-      tags: z.array(Tag).optional(),
+      tags: TagArray.optional(),
       externalDocs: ExternalDocumentation.optional(),
     },
     "Document"
@@ -529,28 +575,42 @@ export namespace OpenAPI {
   export type XML = z.infer<typeof XML>;
   export type Discriminator = z.infer<typeof Discriminator>;
   export type Schema = z.infer<typeof Schema>;
+  export type Schemas = z.infer<typeof Schemas>;
   export type MediaType = z.infer<typeof MediaType>;
   export type Content = z.infer<typeof Content>;
   export type Example = z.infer<typeof Example>;
+  export type Examples = z.infer<typeof Examples>;
   export type Encoding = z.infer<typeof Encoding>;
+  export type Encodings = z.infer<typeof Encodings>;
   export type Header = z.infer<typeof Header>;
+  export type Headers = z.infer<typeof Headers>;
   export type Link = z.infer<typeof Link>;
+  export type Links = z.infer<typeof Links>;
   export type Server = z.infer<typeof Server>;
+  export type Servers = z.infer<typeof Servers>;
   export type ServerVariable = z.infer<typeof ServerVariable>;
+  export type ServerVariables = z.infer<typeof ServerVariables>;
   export type Response = z.infer<typeof Response>;
   export type Responses = z.infer<typeof Responses>;
+  export type ComponentResponses = z.infer<typeof ComponentResponses>;
   export type Parameter = z.infer<typeof Parameter>;
   export type Parameters = z.infer<typeof Parameters>;
+  export type ComponentParameters = z.infer<typeof ComponentParameters>;
   export type RequestBody = z.infer<typeof RequestBody>;
+  export type RequestBodies = z.infer<typeof RequestBodies>;
   export type Callback = z.infer<typeof Callback>;
+  export type Callbacks = z.infer<typeof Callbacks>;
   export type SecurityRequirement = z.infer<typeof SecurityRequirement>;
   export type Operation = z.infer<typeof Operation>;
   export type PathItem = z.infer<typeof PathItem>;
+  export type Paths = z.infer<typeof Paths>;
   export type SecurityScheme = z.infer<typeof SecurityScheme>;
+  export type SecuritySchemes = z.infer<typeof SecuritySchemes>;
   export type OAuthFlows = z.infer<typeof OAuthFlows>;
   export type OAuthFlow = z.infer<typeof OAuthFlow>;
   export type Components = z.infer<typeof Components>;
   export type Tag = z.infer<typeof Tag>;
+  export type TagArray = z.infer<typeof TagArray>;
   export type Contact = z.infer<typeof Contact>;
   export type License = z.infer<typeof License>;
   export type Info = z.infer<typeof Info>;

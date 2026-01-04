@@ -46,41 +46,55 @@ export interface Visitor {
   Contact?: VisitorFn<OpenAPI.Contact>;
   License?: VisitorFn<OpenAPI.License>;
   ServerVariable?: VisitorFn<OpenAPI.ServerVariable>;
+  ServerVariables?: VisitorFn<OpenAPI.ServerVariables>;
   OAuthFlow?: VisitorFn<OpenAPI.OAuthFlow>;
   Example?: VisitorFn<OpenAPI.Example>;
+  Examples?: VisitorFn<OpenAPI.Examples>;
 
   // Layer 2: Simple composed types
   ExternalDocumentation?: VisitorFn<OpenAPI.ExternalDocumentation>;
   OAuthFlows?: VisitorFn<OpenAPI.OAuthFlows>;
   Server?: VisitorFn<OpenAPI.Server>;
+  Servers?: VisitorFn<OpenAPI.Servers>;
 
   // Layer 3: Schema
   Schema?: VisitorFn<OpenAPI.Schema>;
+  Schemas?: VisitorFn<OpenAPI.Schemas>;
 
   // Layer 4: Schema-dependent types
   Encoding?: VisitorFn<OpenAPI.Encoding>;
+  Encodings?: VisitorFn<OpenAPI.Encodings>;
   MediaType?: VisitorFn<OpenAPI.MediaType>;
   Content?: VisitorFn<OpenAPI.Content>;
   Header?: VisitorFn<OpenAPI.Header>;
+  Headers?: VisitorFn<OpenAPI.Headers>;
   Link?: VisitorFn<OpenAPI.Link>;
+  Links?: VisitorFn<OpenAPI.Links>;
   Response?: VisitorFn<OpenAPI.Response>;
   Responses?: VisitorFn<OpenAPI.Responses>;
+  ComponentResponses?: VisitorFn<OpenAPI.ComponentResponses>;
   Parameter?: VisitorFn<OpenAPI.Parameter>;
   Parameters?: VisitorFn<OpenAPI.Parameters>;
+  ComponentParameters?: VisitorFn<OpenAPI.ComponentParameters>;
   RequestBody?: VisitorFn<OpenAPI.RequestBody>;
+  RequestBodies?: VisitorFn<OpenAPI.RequestBodies>;
   SecurityScheme?: VisitorFn<OpenAPI.SecurityScheme>;
+  SecuritySchemes?: VisitorFn<OpenAPI.SecuritySchemes>;
 
   // Layer 5: Operation-level types
   SecurityRequirement?: VisitorFn<OpenAPI.SecurityRequirement>;
   Operation?: VisitorFn<OpenAPI.Operation>;
   PathItem?: VisitorFn<OpenAPI.PathItem>;
+  Paths?: VisitorFn<OpenAPI.Paths>;
   Callback?: VisitorFn<OpenAPI.Callback>;
+  Callbacks?: VisitorFn<OpenAPI.Callbacks>;
 
   // Layer 6: Components
   Components?: VisitorFn<OpenAPI.Components>;
 
   // Layer 7: Top-level types
   Tag?: VisitorFn<OpenAPI.Tag>;
+  TagArray?: VisitorFn<OpenAPI.TagArray>;
   Info?: VisitorFn<OpenAPI.Info>;
   Document?: VisitorFn<OpenAPI.Document>;
 

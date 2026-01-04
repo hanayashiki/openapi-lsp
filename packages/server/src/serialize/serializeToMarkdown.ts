@@ -50,6 +50,14 @@ export function serializeToMarkdown(
       });
     default:
       // Fallback for other types
-      return `**${nominal}**: ${name}`;
+      return `**${nominal}**: ${name}${
+        value && Array.isArray(value)
+          ? ` (${value.length} item${value.length >= 2 ? "s" : ""})`
+          : value && typeof value === "object"
+          ? ((length) => ` (${length} key${length >= 2 ? "s" : ""})`)(
+              Object.keys(value).length
+            )
+          : ``
+      }`;
   }
 }

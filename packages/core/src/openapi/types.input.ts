@@ -90,6 +90,11 @@ export namespace OpenAPIInput {
     { default: "" }
   );
 
+  export const ServerVariables = TaggedRecord(
+    ServerVariable,
+    "ServerVariables"
+  );
+
   // OAuth Flow Object
   export const OAuthFlow = TaggedObjectCatch(
     {
@@ -150,14 +155,13 @@ export namespace OpenAPIInput {
     {
       url: z.string().catch(""),
       description: z.string().optional().catch(undefined),
-      variables: z
-        .record(z.string(), ServerVariable)
-        .optional()
-        .catch(undefined),
+      variables: ServerVariables.optional().catch(undefined),
     },
     "Server",
     { url: "" }
   );
+
+  export const Servers = TaggedArray(Server, "Servers");
 
   // ===========================================================================
   // Layer 3: Schema (recursive - uses z.lazy)
@@ -271,6 +275,9 @@ export namespace OpenAPIInput {
   const SchemaOrReference = z.union([TaggedReference("Schema"), Schema]);
   const ExampleOrReference = z.union([TaggedReference("Example"), Example]);
 
+  // Examples record (used in MediaType, Header, Parameter)
+  export const Examples = TaggedRecord(ExampleOrReference, "Examples");
+
   // Encoding Object
   export const Encoding = TaggedObjectCatch(
     {
@@ -287,16 +294,15 @@ export namespace OpenAPIInput {
     {}
   );
 
+  export const Encodings = TaggedRecord(Encoding, "Encodings");
+
   // MediaType Object
   export const MediaType = TaggedObjectCatch(
     {
       schema: SchemaOrReference.optional().catch(undefined),
       example: z.unknown().optional(),
-      examples: z
-        .record(z.string(), ExampleOrReference)
-        .optional()
-        .catch(undefined),
-      encoding: z.record(z.string(), Encoding).optional().catch(undefined),
+      examples: Examples.optional().catch(undefined),
+      encoding: Encodings.optional().catch(undefined),
     },
     "MediaType",
     {}
@@ -316,10 +322,7 @@ export namespace OpenAPIInput {
       allowReserved: z.boolean().optional().catch(undefined),
       schema: SchemaOrReference.optional().catch(undefined),
       example: z.unknown().optional(),
-      examples: z
-        .record(z.string(), ExampleOrReference)
-        .optional()
-        .catch(undefined),
+      examples: Examples.optional().catch(undefined),
       content: Content.optional().catch(undefined),
     },
     "Header",
@@ -327,6 +330,9 @@ export namespace OpenAPIInput {
   );
 
   const HeaderOrReference = z.union([TaggedReference("Header"), Header]);
+
+  // Headers record (used in Response, Components)
+  export const Headers = TaggedRecord(HeaderOrReference, "Headers");
 
   // Link Object
   export const Link = TaggedObjectCatch(
@@ -344,16 +350,16 @@ export namespace OpenAPIInput {
 
   const LinkOrReference = z.union([TaggedReference("Link"), Link]);
 
+  // Links record (used in Response, Components)
+  export const Links = TaggedRecord(LinkOrReference, "Links");
+
   // Response Object
   export const Response = TaggedObjectCatch(
     {
       description: z.string().catch(""),
-      headers: z
-        .record(z.string(), HeaderOrReference)
-        .optional()
-        .catch(undefined),
+      headers: Headers.optional().catch(undefined),
       content: Content.optional().catch(undefined),
-      links: z.record(z.string(), LinkOrReference).optional().catch(undefined),
+      links: Links.optional().catch(undefined),
     },
     "Response",
     { description: "" }
@@ -375,10 +381,7 @@ export namespace OpenAPIInput {
       allowReserved: z.boolean().optional().catch(undefined),
       schema: SchemaOrReference.optional().catch(undefined),
       example: z.unknown().optional(),
-      examples: z
-        .record(z.string(), ExampleOrReference)
-        .optional()
-        .catch(undefined),
+      examples: Examples.optional().catch(undefined),
       content: Content.optional().catch(undefined),
     },
     "Parameter",
@@ -431,6 +434,28 @@ export namespace OpenAPIInput {
     SecurityScheme,
   ]);
 
+  // Tagged records for Components fields
+  export const Schemas = TaggedRecord(SchemaOrReference, "Schemas");
+  // Note: Examples is defined earlier (used in MediaType, Header, Parameter)
+  // Note: Headers is defined earlier (used in Response)
+  // Note: Links is defined earlier (used in Response)
+  export const ComponentResponses = TaggedRecord(
+    ResponseOrReference,
+    "ComponentResponses"
+  );
+  export const ComponentParameters = TaggedRecord(
+    ParameterOrReference,
+    "ComponentParameters"
+  );
+  export const RequestBodies = TaggedRecord(
+    RequestBodyOrReference,
+    "RequestBodies"
+  );
+  export const SecuritySchemes = TaggedRecord(
+    SecuritySchemeOrReference,
+    "SecuritySchemes"
+  );
+
   // ===========================================================================
   // Layer 5: Operation-level types
   // ===========================================================================
@@ -451,7 +476,7 @@ export namespace OpenAPIInput {
       callbacks: z.record(z.string(), z.unknown()).optional().catch(undefined),
       deprecated: z.boolean().optional().catch(undefined),
       security: z.array(SecurityRequirement).optional().catch(undefined),
-      servers: z.array(Server).optional().catch(undefined),
+      servers: Servers.optional().catch(undefined),
     },
     "Operation",
     { responses: {} }
@@ -470,7 +495,7 @@ export namespace OpenAPIInput {
       head: Operation.optional().catch(undefined),
       patch: Operation.optional().catch(undefined),
       trace: Operation.optional().catch(undefined),
-      servers: z.array(Server).optional().catch(undefined),
+      servers: Servers.optional().catch(undefined),
       parameters: Parameters.optional().catch(undefined),
     },
     "PathItem",
@@ -479,10 +504,15 @@ export namespace OpenAPIInput {
 
   const PathItemOrReference = z.union([TaggedReference("PathItem"), PathItem]);
 
+  // Paths record (used in Document)
+  export const Paths = TaggedRecord(PathItemOrReference, "Paths");
+
   // Callback Object
-  export const Callback = z.record(z.string(), PathItemOrReference).catch({});
+  export const Callback = TaggedRecord(PathItemOrReference, "Callback");
 
   const CallbackOrReference = z.union([TaggedReference("Callback"), Callback]);
+
+  export const Callbacks = TaggedRecord(CallbackOrReference, "Callbacks");
 
   // ===========================================================================
   // Layer 6: Components
@@ -491,39 +521,15 @@ export namespace OpenAPIInput {
   // Components Object
   export const Components = TaggedObjectCatch(
     {
-      schemas: z
-        .record(z.string(), SchemaOrReference)
-        .optional()
-        .catch(undefined),
-      responses: z
-        .record(z.string(), ResponseOrReference)
-        .optional()
-        .catch(undefined),
-      parameters: z
-        .record(z.string(), ParameterOrReference)
-        .optional()
-        .catch(undefined),
-      examples: z
-        .record(z.string(), ExampleOrReference)
-        .optional()
-        .catch(undefined),
-      requestBodies: z
-        .record(z.string(), RequestBodyOrReference)
-        .optional()
-        .catch(undefined),
-      headers: z
-        .record(z.string(), HeaderOrReference)
-        .optional()
-        .catch(undefined),
-      securitySchemes: z
-        .record(z.string(), SecuritySchemeOrReference)
-        .optional()
-        .catch(undefined),
-      links: z.record(z.string(), LinkOrReference).optional().catch(undefined),
-      callbacks: z
-        .record(z.string(), CallbackOrReference)
-        .optional()
-        .catch(undefined),
+      schemas: Schemas.optional().catch(undefined),
+      responses: ComponentResponses.optional().catch(undefined),
+      parameters: ComponentParameters.optional().catch(undefined),
+      examples: Examples.optional().catch(undefined),
+      requestBodies: RequestBodies.optional().catch(undefined),
+      headers: Headers.optional().catch(undefined),
+      securitySchemes: SecuritySchemes.optional().catch(undefined),
+      links: Links.optional().catch(undefined),
+      callbacks: Callbacks.optional().catch(undefined),
     },
     "Components",
     {}
@@ -544,6 +550,9 @@ export namespace OpenAPIInput {
     { name: "" }
   );
 
+  // Tags
+  export const TagArray = TaggedArray(Tag, "TagArray");
+
   // Info Object
   export const Info = TaggedObjectCatch(
     {
@@ -563,14 +572,11 @@ export namespace OpenAPIInput {
     {
       openapi: z.string().catch("3.0.3"),
       info: Info,
-      servers: z.array(Server).optional().catch(undefined),
-      paths: z
-        .record(z.string(), PathItemOrReference)
-        .optional()
-        .catch(undefined),
+      servers: Servers.optional().catch(undefined),
+      paths: Paths.optional().catch(undefined),
       components: Components.optional().catch(undefined),
       security: z.array(SecurityRequirement).optional().catch(undefined),
-      tags: z.array(Tag).optional().catch(undefined),
+      tags: TagArray.optional().catch(undefined),
       externalDocs: ExternalDocumentation.optional().catch(undefined),
     },
     "Document",
@@ -585,26 +591,40 @@ export namespace OpenAPIInput {
   export type XML = z.infer<typeof XML>;
   export type Discriminator = z.infer<typeof Discriminator>;
   export type Schema = z.infer<typeof Schema>;
+  export type Schemas = z.infer<typeof Schemas>;
   export type MediaType = z.infer<typeof MediaType>;
   export type Example = z.infer<typeof Example>;
+  export type Examples = z.infer<typeof Examples>;
   export type Encoding = z.infer<typeof Encoding>;
+  export type Encodings = z.infer<typeof Encodings>;
   export type Header = z.infer<typeof Header>;
+  export type Headers = z.infer<typeof Headers>;
   export type Link = z.infer<typeof Link>;
+  export type Links = z.infer<typeof Links>;
   export type Server = z.infer<typeof Server>;
+  export type Servers = z.infer<typeof Servers>;
   export type ServerVariable = z.infer<typeof ServerVariable>;
+  export type ServerVariables = z.infer<typeof ServerVariables>;
   export type Response = z.infer<typeof Response>;
   export type Responses = z.infer<typeof Responses>;
+  export type ComponentResponses = z.infer<typeof ComponentResponses>;
   export type Parameter = z.infer<typeof Parameter>;
+  export type ComponentParameters = z.infer<typeof ComponentParameters>;
   export type RequestBody = z.infer<typeof RequestBody>;
+  export type RequestBodies = z.infer<typeof RequestBodies>;
   export type Callback = z.infer<typeof Callback>;
+  export type Callbacks = z.infer<typeof Callbacks>;
   export type SecurityRequirement = z.infer<typeof SecurityRequirement>;
   export type Operation = z.infer<typeof Operation>;
   export type PathItem = z.infer<typeof PathItem>;
+  export type Paths = z.infer<typeof Paths>;
   export type SecurityScheme = z.infer<typeof SecurityScheme>;
+  export type SecuritySchemes = z.infer<typeof SecuritySchemes>;
   export type OAuthFlows = z.infer<typeof OAuthFlows>;
   export type OAuthFlow = z.infer<typeof OAuthFlow>;
   export type Components = z.infer<typeof Components>;
   export type Tag = z.infer<typeof Tag>;
+  export type TagArray = z.infer<typeof TagArray>;
   export type Contact = z.infer<typeof Contact>;
   export type License = z.infer<typeof License>;
   export type Info = z.infer<typeof Info>;

@@ -17,7 +17,7 @@ function serializeLiteral(value: unknown, ctx: LiteralSerializerContext): void {
 
   // Depth limit reached
   if (ctx.currentDepth > ctx.maxDepth) {
-    printer.write("...");
+    printer.write("/* ... */");
     return;
   }
 
@@ -57,7 +57,9 @@ function serializeLiteral(value: unknown, ctx: LiteralSerializerContext): void {
       printer.write(",");
     }
     if (hasMore) {
-      printer.newline().write(`... (${value.length - ctx.maxItems} more)`);
+      printer
+        .newline()
+        .write(`/* ... (${value.length - ctx.maxItems} more) */`);
     }
 
     printer.popIndentation();
@@ -87,7 +89,9 @@ function serializeLiteral(value: unknown, ctx: LiteralSerializerContext): void {
       printer.write(",");
     }
     if (hasMore) {
-      printer.newline().write(`... (${entries.length - ctx.maxItems} more)`);
+      printer
+        .newline()
+        .write(`/* ... (${entries.length - ctx.maxItems} more) */`);
     }
 
     printer.popIndentation();

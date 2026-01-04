@@ -69,7 +69,7 @@ git tag v<new-version>
 ### 6. Publish to VS Code Marketplace
 ```bash
 cd packages/client
-pnpm publish
+npx vsce publish --no-dependencies
 ```
 
 This runs `vsce publish --no-dependencies` which publishes to the VS Code marketplace.
