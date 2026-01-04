@@ -89,8 +89,8 @@ export class QueryCache {
 
         const v = (await this.compute(key)) as V;
 
-        console.info("[loader.use]", key);
-        this.logGraphviz();
+        // console.info("[loader.use]", key);
+        // this.logGraphviz();
         return v;
       },
       load: async (ctx: CacheComputeContext, key: K): Promise<V> => {
