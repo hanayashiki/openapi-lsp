@@ -1,3 +1,8 @@
+# 0.2.0
+
+1. Support single file mode
+2. Improved hovering with enhanced type tagging
+
 # 0.1.7
 
 1. Fixed parameter type resolution

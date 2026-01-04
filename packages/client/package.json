@@ -6,7 +6,7 @@
   },
   "displayName": "OpenAPI LSP",
   "description": "Language support for OpenAPI/Swagger specifications",
-  "version": "0.1.7",
+  "version": "0.2.0",
   "publisher": "hanayashiki",
   "license": "MIT",
   "icon": "icons/plugin-icon.png",
