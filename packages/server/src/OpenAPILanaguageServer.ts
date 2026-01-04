@@ -29,7 +29,6 @@ import {
   serializeLiteralToMarkdown,
 } from "./serialize/index.js";
 import { OpenAPI, OpenAPITag } from "@openapi-lsp/core/openapi";
-import { SolveResult } from "@openapi-lsp/core/solver";
 import { unwrap } from "@openapi-lsp/core/result";
 
 /**
@@ -230,11 +229,7 @@ export class OpenAPILanguageServer {
       // For Parameters, resolve any $ref items to their actual values
       let resolvedValue = value;
       if (nominal === "Parameters" && Array.isArray(value)) {
-        resolvedValue = await this.resolveParameterRefs(
-          value,
-          targetNodeId,
-          groupResult.solveResult
-        );
+        resolvedValue = await this.resolveParameterRefs(uri, value);
       }
 
       const name: string =
@@ -266,9 +261,8 @@ export class OpenAPILanguageServer {
    * to name the parameter unless we load it.
    */
   private async resolveParameterRefs(
-    items: unknown[],
-    parametersNodeId: string,
-    solveResult: SolveResult
+    uri: string,
+    items: unknown[]
   ): Promise<OpenAPI.Parameter[]> {
     const resolved: OpenAPI.Parameter[] = [];
 
@@ -277,31 +271,62 @@ export class OpenAPILanguageServer {
 
       if (isReference(item)) {
         // This is a $ref - resolve it using the solver
-        const itemNodeId = `${parametersNodeId}/${i}`;
-        const valueNodeId = solveResult.getValueNodeId(itemNodeId);
-
-        if (valueNodeId) {
-          // Parse the valueNodeId to get docUri and path
-          const parseResult = parseUriWithJsonPointer(valueNodeId);
-          if (parseResult.success) {
-            const doc = await this.documentManager.getServerDocument(
-              parseResult.data.docUri
-            );
-            if (doc.type !== "tomb") {
-              const value = doc.yaml.getValueAtPath(
-                parseResult.data.jsonPointer
-              );
-              if (value && typeof value === "object") {
-                resolved.push(value as OpenAPI.Parameter);
-                continue;
-              }
-            }
-          }
+        const pointerResult = parseUriWithJsonPointer(item.$ref, uri);
+        if (!pointerResult.success) {
+          console.error(
+            `[resolveParameterRefs] Failed to parse ref: ${item.$ref}. ignoring.`
+          );
+          continue;
         }
-        // Fallback: skip unresolvable refs
-        console.warn(
-          `[resolveParameterRefs] Could not resolve ref at index ${i}`
+        const targetDocUri = pointerResult.data.docUri;
+        const targetNodeId = pointerResult.data.url.toString();
+
+        const dc = await this.analysisManager.documentConnectivityLoader.use([
+          "documentConnectivity",
+        ]);
+        const groupId = DocumentConnectivity.getGroupId(dc, targetDocUri);
+        const { solveResult } =
+          await this.analysisManager.groupAnalysisLoader.use([
+            "groupAnalysis",
+            groupId,
+          ]);
+        const valueNodeId = solveResult.getValueNodeId(targetNodeId);
+
+        if (!valueNodeId) {
+          console.warn(
+            `[resolveParameterRefs] Could not resolve nominal at index ${item.$ref}`
+          );
+          continue;
+        }
+
+        // Parse the valueNodeId to get docUri and path
+        const parseResult = parseUriWithJsonPointer(valueNodeId);
+        if (!parseResult.success) {
+          console.error(
+            `[resolveParameterRefs] Failed to parse value node: ${valueNodeId}. ignoring.`
+          );
+          continue;
+        }
+
+        const doc = await this.documentManager.getServerDocument(
+          parseResult.data.docUri
         );
+        if (doc.type === "tomb") {
+          console.error(
+            `[resolveParameterRefs] Failed to loaded tomb: ${parseResult.data.docUri}`
+          );
+          continue;
+        }
+
+        const value = doc.yaml.getValueAtPath(parseResult.data.jsonPointer);
+        if (value && typeof value === "object") {
+          resolved.push(value as OpenAPI.Parameter);
+        } else {
+          console.error(
+            `[resolveParameterRefs] Unexpected loaded value: ${valueNodeId}, get type ${typeof value}`
+          );
+          continue;
+        }
       } else if (item && typeof item === "object") {
         // Already a resolved Parameter object
         resolved.push(item as OpenAPI.Parameter);

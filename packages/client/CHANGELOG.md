@@ -1,3 +1,7 @@
+# 0.1.7
+
+1. Fixed parameter type resolution
+
 # 0.1.6
 
 1. Fixed caching issues
