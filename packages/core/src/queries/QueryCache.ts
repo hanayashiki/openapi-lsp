@@ -35,6 +35,7 @@ export type CacheLoader<K, V> = {
   use: (key: K) => Promise<V>;
   load: (ctx: CacheComputeContext, key: K) => Promise<V>;
   invalidate: (key: K) => void;
+  invalidateMatching: (predicate: (key: K) => boolean) => void;
 };
 
 const unwrapGetResult = (result: CacheGetResult): CacheEntry => {
@@ -51,7 +52,7 @@ export class QueryCache {
   private inflight = new Map<HashedCacheKey, Promise<CacheValue>>();
   private store = new Map<HashedCacheKey, CacheEntry>();
 
-  constructor(private debugCache: boolean = false) {}
+  constructor(private debugCache: boolean = true) {}
 
   private log(message: string, key: CacheKey): void {
     if (this.debugCache) {
@@ -101,6 +102,9 @@ export class QueryCache {
       invalidate: (key: K): void => {
         this.invalidateByKey(key);
       },
+      invalidateMatching: (predicate: (key: K) => boolean): void => {
+        this.invalidateMatching((key) => predicate(key as K));
+      },
     };
   };
 
@@ -144,13 +148,11 @@ export class QueryCache {
       for (const [upstreamHashed, oldHash] of entry.upstreamHashes) {
         const upstream = this.store.get(upstreamHashed);
         if (!upstream || !upstream.hash.success) {
-          mismatchReason = () =>
-            `upstream ${upstreamHashed} has no hash`;
+          mismatchReason = () => `upstream ${upstreamHashed} has no hash`;
           break;
         }
         if (upstream.hash.data !== oldHash) {
-          mismatchReason = () =>
-            `upstream ${upstreamHashed} hash changed`;
+          mismatchReason = () => `upstream ${upstreamHashed} hash changed`;
           break;
         }
       }
@@ -242,6 +244,17 @@ export class QueryCache {
     this.invalidateByHashedKey(hashed, new Set());
   }
 
+  /**
+   * Invalidate all cache entries whose keys match the predicate.
+   */
+  invalidateMatching(predicate: (key: CacheKey) => boolean): void {
+    for (const [hashed, entry] of this.store) {
+      if (predicate(entry.key)) {
+        this.invalidateByHashedKey(hashed, new Set());
+      }
+    }
+  }
+
   private invalidateByHashedKey(
     hashed: HashedCacheKey,
     visited: Set<HashedCacheKey>
@@ -288,9 +301,11 @@ export class QueryCache {
       const color = entry.invalidated
         ? "orange"
         : entry.value.success
-          ? "green"
-          : "gray";
-      lines.push(`  "${hashedKey}" [label="${escapedLabel}" color="${color}"];`);
+        ? "green"
+        : "gray";
+      lines.push(
+        `  "${hashedKey}" [label="${escapedLabel}" color="${color}"];`
+      );
     }
 
     // Add edges from each node to its upstreams (upstreams are now HashedCacheKey)

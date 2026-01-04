@@ -18,7 +18,7 @@ This skill handles the full release workflow for the OpenAPI LSP VS Code extensi
 ## Workflow Steps
 
 ### 1. Run Pre-commit Checks
-First, run all pre-commit hooks to ensure code quality:
+First, run all pre-commit hooks to ensure code quality, **without sandboxing**:
 ```bash
 npm run lint
 npm run test

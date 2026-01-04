@@ -4,6 +4,7 @@ export type CacheKey =
   | string
   | number
   | null
+  | undefined
   | boolean
   | CacheKey[]
   | {
@@ -19,6 +20,7 @@ const canonicalize = (value: CacheKey): CacheKey => {
     typeof value === "string" ||
     typeof value === "number" ||
     typeof value === "boolean" ||
+    typeof value === "undefined" ||
     value === null
   ) {
     return value;
@@ -28,7 +30,11 @@ const canonicalize = (value: CacheKey): CacheKey => {
   }
   // Object: sort keys and recursively canonicalize values
   const sorted: Record<string, CacheKey> = {};
-  for (const key of Object.keys(value).sort()) {
+  for (const [key, item] of Object.entries(value).sort()) {
+    // Treat `undefined` as no key matching TypeScript semantics.
+    if (item === undefined) {
+      continue;
+    }
     sorted[key] = canonicalize(value[key]);
   }
   return sorted;

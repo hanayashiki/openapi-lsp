@@ -1,10 +1,6 @@
-import { minimatch } from "minimatch";
 import { ok, err, Result } from "@openapi-lsp/core/result";
-import { VFS, VFSError, GlobEntry, GlobOptions } from "./VFS.js";
-
-function matchesAny(filename: string, patterns: string[]): boolean {
-  return patterns.some((pattern) => minimatch(filename, pattern));
-}
+import { VFS, VFSError, GlobOptions } from "./VFS.js";
+import { matchPathWithGlob } from "./glob.js";
 
 export class MemoryVFS implements VFS {
   private files: Map<string, string>;
@@ -29,26 +25,13 @@ export class MemoryVFS implements VFS {
   async glob(
     pattern: string | string[],
     options: GlobOptions
-  ): Promise<GlobEntry[]> {
+  ): Promise<string[]> {
     const patterns = Array.isArray(pattern) ? pattern : [pattern];
-    const excludePatterns = options.exclude
-      ? Array.isArray(options.exclude)
-        ? options.exclude
-        : [options.exclude]
-      : [];
+    const results: string[] = [];
 
-    const results: GlobEntry[] = [];
-    const cwd = options.cwd.endsWith("/") ? options.cwd : options.cwd + "/";
-
-    for (const [filePath, content] of this.files) {
-      if (!filePath.startsWith(cwd)) continue;
-
-      const relativePath = filePath.slice(cwd.length);
-      if (
-        matchesAny(relativePath, patterns) &&
-        !matchesAny(relativePath, excludePatterns)
-      ) {
-        results.push({ path: filePath, content });
+    for (const [filePath] of this.files) {
+      if (matchPathWithGlob(filePath, patterns, options)) {
+        results.push(filePath);
       }
     }
     return results;

@@ -24,15 +24,24 @@ connection.onInitialize((params: InitializeParams): InitializeResult => {
      * 2. Handle configurations (that we can) on resource-bases.
      */
     configuration: ExtensionConfiguration.parse(params.initializationOptions),
-    workspaceFolders:
-      params.workspaceFolders ?? /** Fallback using deprecated rootUri, then use current working path */ [
-        {
-          name: "Root",
-          uri:
-            params.rootUri ??
-            pathToFileURL(params.rootPath ?? process.cwd()).toString(),
-        },
-      ],
+    workspaceFolders: params.workspaceFolders
+      ? params.workspaceFolders
+      : /** Fallback using deprecated rootUri, then use current working path */
+      typeof params.rootUri === "string"
+      ? [
+          {
+            name: "Root",
+            uri: params.rootUri,
+          },
+        ]
+      : typeof params.rootPath === "string"
+      ? [
+          {
+            name: "Root",
+            uri: pathToFileURL(params.rootPath).toString(),
+          },
+        ]
+      : [],
   };
 
   const server = new OpenAPILanguageServer(

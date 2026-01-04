@@ -28,35 +28,6 @@ import { fileURLToPath, pathToFileURL } from "url";
 import { openapiFilePatterns } from "@openapi-lsp/core/constants";
 import { DocumentReferenceManager } from "./DocumentReferenceManager.js";
 
-/** Add a single nominal to a Map<NodeId, NominalId[]> */
-function mergeNominal(
-  target: Map<NodeId, NominalId[]>,
-  nodeId: NodeId,
-  nominal: NominalId
-): void {
-  if (!target.has(nodeId)) target.set(nodeId, []);
-  const arr = target.get(nodeId)!;
-  if (!arr.includes(nominal)) arr.push(nominal);
-}
-
-/** Merge all nominals from source into target */
-function mergeNominals(
-  target: Map<NodeId, NominalId[]>,
-  source: Map<NodeId, NominalId[]>
-): void {
-  for (const [nodeId, nominals] of source) {
-    for (const nominal of nominals) {
-      mergeNominal(target, nodeId, nominal);
-    }
-  }
-}
-
-/** Extract the document URI from a nodeId (e.g., "file:///foo.yaml#/bar" → "file:///foo.yaml") */
-function getUriFromNodeId(nodeId: NodeId): string {
-  const hashIndex = nodeId.indexOf("#");
-  return hashIndex >= 0 ? nodeId.slice(0, hashIndex) : nodeId;
-}
-
 export class AnalysisManager {
   parseResultLoader: CacheLoader<["specDocument.parse", string], ParseResult>;
   documentConnectivityLoader: CacheLoader<
@@ -94,32 +65,52 @@ export class AnalysisManager {
       async ([_], ctx): Promise<LoaderResult<DocumentConnectivity>> => {
         const dc = DocumentConnectivity.createDefault();
 
+        const globExclude = [
+          this.workspace.configuration["openapi-lsp.discoverRoots.ignore"],
+        ];
+
+        const globPatterns = openapiFilePatterns.map((p) => `**/${p}`);
+
         // Discover all roots from all workspace folders
         const allRoots: string[] = [];
         for (const folder of this.workspace.workspaceFolders) {
           const folderPath = fileURLToPath(folder.uri);
-          const roots = await this.vfs.glob(
-            openapiFilePatterns.map((p) => `**/${p}`),
-            {
-              cwd: folderPath,
-              exclude: [
-                this.workspace.configuration[
-                  "openapi-lsp.discoverRoots.ignore"
-                ],
-              ],
-            }
-          );
-          allRoots.push(
-            ...roots.map(({ path }) => pathToFileURL(path).toString())
-          );
+          const roots = await this.vfs.glob(globPatterns, {
+            cwd: folderPath,
+            exclude: globExclude,
+          });
+          allRoots.push(...roots.map((p) => pathToFileURL(p).toString()));
 
           console.info(
             `Discovered root${
               roots.length !== 1 ? "s" : ""
             } ${new Intl.ListFormat("en-US").format(
-              roots.map((root) => root.path)
+              roots
             )} for workspace folder ${JSON.stringify(folder.name)}`
           );
+        }
+
+        // Also discover roots from open documents (enables workspace-less mode)
+        const documentRoots = await this.documentManager.loadGlob(
+          ctx,
+          globPatterns,
+          { cwd: "", exclude: globExclude }
+        );
+
+        if (documentRoots.length > 0) {
+          console.info(
+            `Discovered root${
+              documentRoots.length !== 1 ? "s" : ""
+            } ${new Intl.ListFormat("en-US").format(
+              documentRoots
+            )} from documents`
+          );
+
+          for (const uri of documentRoots) {
+            if (!allRoots.includes(uri)) {
+              allRoots.push(uri);
+            }
+          }
         }
 
         await Promise.all(
@@ -158,7 +149,7 @@ export class AnalysisManager {
             nodeId,
             nominal,
           ] of upstream.solveResult.getOutgoingNominals()) {
-            mergeNominal(incomingNominals, nodeId, nominal);
+            AnalysisManager.mergeNominal(incomingNominals, nodeId, nominal);
           }
         }
 
@@ -222,6 +213,24 @@ export class AnalysisManager {
     memberUris: Set<string>,
     incomingNominals: Map<NodeId, NominalId[]>
   ): Promise<Map<NodeId, NominalId[]>> {
+    /** Merge all nominals from source into target */
+    function mergeNominals(
+      target: Map<NodeId, NominalId[]>,
+      source: Map<NodeId, NominalId[]>
+    ): void {
+      for (const [nodeId, nominals] of source) {
+        for (const nominal of nominals) {
+          AnalysisManager.mergeNominal(target, nodeId, nominal);
+        }
+      }
+    }
+
+    /** Extract the document URI from a nodeId (e.g., "file:///foo.yaml#/bar" → "file:///foo.yaml") */
+    function getUriFromNodeId(nodeId: NodeId): string {
+      const hashIndex = nodeId.indexOf("#");
+      return hashIndex >= 0 ? nodeId.slice(0, hashIndex) : nodeId;
+    }
+
     const allNominals = new Map<NodeId, NominalId[]>();
 
     // Track which (nodeId, nominal) pairs have been processed as entry points
@@ -231,7 +240,7 @@ export class AnalysisManager {
     const pendingEntryPoints = new Map<NodeId, NominalId[]>();
     for (const [nodeId, nominals] of incomingNominals) {
       for (const nominal of nominals) {
-        mergeNominal(pendingEntryPoints, nodeId, nominal);
+        AnalysisManager.mergeNominal(pendingEntryPoints, nodeId, nominal);
       }
     }
 
@@ -240,7 +249,11 @@ export class AnalysisManager {
       const doc = await this.documentManager.load(ctx, uri);
       if (doc.type === "openapi") {
         const rootNodeId = uriWithJsonPointerLoose(uri, []);
-        mergeNominal(pendingEntryPoints, rootNodeId, "Document");
+        AnalysisManager.mergeNominal(
+          pendingEntryPoints,
+          rootNodeId,
+          "Document"
+        );
       }
     }
 
@@ -272,13 +285,20 @@ export class AnalysisManager {
             mergeNominals(allNominals, result.outgoingNominals);
 
             // Add outgoing nominals that target within-SCC nodes as new entry points
-            for (const [targetNodeId, targetNominals] of result.outgoingNominals) {
+            for (const [
+              targetNodeId,
+              targetNominals,
+            ] of result.outgoingNominals) {
               const targetUri = getUriFromNodeId(targetNodeId);
               if (memberUris.has(targetUri)) {
                 for (const nom of targetNominals) {
                   const targetKey = `${targetNodeId}\0${nom}`;
                   if (!processedEntryPoints.has(targetKey)) {
-                    mergeNominal(pendingEntryPoints, targetNodeId, nom);
+                    AnalysisManager.mergeNominal(
+                      pendingEntryPoints,
+                      targetNodeId,
+                      nom
+                    );
                   }
                 }
               }
@@ -432,6 +452,17 @@ export class AnalysisManager {
       }
       dc.groupIncomingEdges.set(groupId, incomingGroups);
     }
+  }
+
+  /** Add a single nominal to a Map<NodeId, NominalId[]> */
+  private static mergeNominal(
+    target: Map<NodeId, NominalId[]>,
+    nodeId: NodeId,
+    nominal: NominalId
+  ): void {
+    if (!target.has(nodeId)) target.set(nodeId, []);
+    const arr = target.get(nodeId)!;
+    if (!arr.includes(nominal)) arr.push(nominal);
   }
 
   static getConnectivityHash(dc: DocumentConnectivity): string {

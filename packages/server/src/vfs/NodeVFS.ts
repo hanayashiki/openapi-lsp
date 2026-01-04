@@ -2,7 +2,7 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import { ok, err, Result } from "@openapi-lsp/core/result";
-import { VFS, VFSError, GlobEntry, GlobOptions } from "./VFS.js";
+import { VFS, VFSError, GlobOptions } from "./VFS.js";
 import { Workspace } from "../workspace/Workspace.js";
 
 export class NodeVFS implements VFS {
@@ -22,6 +22,14 @@ export class NodeVFS implements VFS {
   }
 
   async readFile(filePath: string): Promise<Result<string, VFSError>> {
+    if (this.workspacePaths.length === 0) {
+      return err({
+        type: "singleFile",
+        path: filePath,
+        message: "In Single File mode, reading unopened file is forbidden",
+      });
+    }
+
     if (!this.isInsideWorkspace(filePath)) {
       return err({ type: "outsideWorkspace", path: filePath });
     }
@@ -34,7 +42,10 @@ export class NodeVFS implements VFS {
     }
   }
 
-  async writeFile(filePath: string, content: string): Promise<Result<void, VFSError>> {
+  async writeFile(
+    filePath: string,
+    content: string
+  ): Promise<Result<void, VFSError>> {
     if (!this.isInsideWorkspace(filePath)) {
       return err({ type: "outsideWorkspace", path: filePath });
     }
@@ -50,8 +61,8 @@ export class NodeVFS implements VFS {
   async glob(
     pattern: string | string[],
     options: GlobOptions
-  ): Promise<GlobEntry[]> {
-    const results: GlobEntry[] = [];
+  ): Promise<string[]> {
+    const results: string[] = [];
 
     for await (const entry of fs.glob(pattern, {
       cwd: options.cwd,
@@ -64,10 +75,12 @@ export class NodeVFS implements VFS {
         continue;
       }
 
-      const result = await this.readFile(fullPath);
-      if (result.success) {
-        results.push({ path: fullPath, content: result.data });
+      // Skip files outside workspace
+      if (!this.isInsideWorkspace(fullPath)) {
+        continue;
       }
+
+      results.push(fullPath);
     }
     return results;
   }

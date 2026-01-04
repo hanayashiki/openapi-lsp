@@ -59,6 +59,32 @@ code --install-extension hanayashiki.openapilspclient
 
 **Referenced files** (`$ref` targets): `*.json`, `*.yml`, `*.yaml`
 
+## Workspace Mode vs Single File Mode
+
+OpenAPI LSP operates in two modes depending on how you open files in VS Code:
+
+### Workspace Mode
+
+When you open a **folder** or **workspace** in VS Code (`File > Open Folder`), the extension has full capabilities:
+
+- **Automatic Discovery** — Scans your workspace for OpenAPI files matching the configured patterns
+- **Cross-File References** — Resolves `$ref` to any file within the workspace
+- **File System Access** — Can read referenced files from disk, even if not currently open
+
+This is the recommended mode for working with OpenAPI specifications that span multiple files.
+
+### Single File Mode
+
+When you open an **individual file** without a workspace (`File > Open File`), the extension runs in a restricted mode:
+
+- **Open Documents Only** — Only analyzes files that are currently open in the editor
+- **No Disk Access** — Cannot read files from disk; all referenced files must be opened manually
+- **Limited Discovery** — Only discovers OpenAPI roots from open documents
+
+To get full cross-file support in single file mode, manually open all referenced files in VS Code.
+
+> **Tip:** If you're working with a multi-file OpenAPI specification, open the containing folder as a workspace for the best experience.
+
 ## Requirements
 
 - OpenAPI 3.0.0 or later
