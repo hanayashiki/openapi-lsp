@@ -55,11 +55,6 @@ export class ServerDocumentManager {
   }
 
   // ---- Change Handlers -----
-
-  onDidOpen(_doc: TextDocument) {
-    // No-op: loader handles cache setup on first use
-  }
-
   invalidate(uri: string) {
     this.loader.invalidate(["serverDocument", uri]);
   }
@@ -75,11 +70,13 @@ export class ServerDocumentManager {
   private async readContent(uri: string): Promise<Result<string, VFSError>> {
     const text = this.documents.get(uri)?.getText();
     if (text) {
+      console.info("[readContent] from documents", uri);
       return ok(text);
     }
 
     const loadTextResult = await this.vfs.readFile(fileURLToPath(uri));
     if (loadTextResult.success) {
+      console.info("[readContent] from vfs", uri);
       return ok(loadTextResult.data);
     } else {
       console.error("Failed to read uri", uri, loadTextResult);

@@ -2,6 +2,13 @@
 name: release
 description: Release a new version of the VS Code extension to the marketplace. Runs checks, compares changes, updates changelog/version, commits, and publishes.
 user_invocable: true
+allowed_tools:
+  - Bash(git *:*)
+  - Bash(npm run build:*)
+  - Bash(npm run lint:*)
+  - Bash(npm run test:*)
+  - Bash(npx vsce *:*)
+disable_sandbox: true
 ---
 
 # Release Command

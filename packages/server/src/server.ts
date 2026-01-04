@@ -70,16 +70,8 @@ connection.onInitialize((params: InitializeParams): InitializeResult => {
     server.onDidChangeContent(change);
   });
 
-  connection.workspace.onDidRenameFiles((params) => {
-    server.onDidRenameFiles(params);
-  });
-
-  connection.workspace.onDidDeleteFiles((params) => {
-    server.onDidDeleteFiles(params);
-  });
-
-  connection.workspace.onDidCreateFiles((params) => {
-    server.onDidCreateFiles(params);
+  documents.onDidClose((change) => {
+    server.onDidClose(change);
   });
 
   connection.onDidChangeWatchedFiles((params) => {
@@ -89,26 +81,8 @@ connection.onInitialize((params: InitializeParams): InitializeResult => {
   return {
     capabilities: {
       textDocumentSync: TextDocumentSyncKind.Incremental,
-      // completionProvider: {
-      //   resolveProvider: true,
-      //   triggerCharacters: ["/", ":", '"', "'"],
-      // },
       hoverProvider: true,
       definitionProvider: true,
-      workspace: {
-        fileOperations: {
-          didRename: {
-            // TODO: derive from constants
-            filters: [{ pattern: { glob: "**/*.{yaml,yml,json}" } }],
-          },
-          didDelete: {
-            filters: [{ pattern: { glob: "**/*.{yaml,yml,json}" } }],
-          },
-          didCreate: {
-            filters: [{ pattern: { glob: "**/*.{yaml,yml,json}" } }],
-          },
-        },
-      },
     },
   };
 });
