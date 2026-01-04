@@ -7,16 +7,13 @@ import {
 } from "@openapi-lsp/core/json-pointer";
 import { TextDocument } from "vscode-languageserver-textdocument";
 import {
-  CreateFilesParams,
   DefinitionLink,
   DefinitionParams,
-  DeleteFilesParams,
   DidChangeWatchedFilesParams,
   FileChangeType,
   Hover,
   HoverParams,
   MarkupKind,
-  RenameFilesParams,
   TextDocumentChangeEvent,
   TextDocuments,
 } from "vscode-languageserver";
@@ -86,53 +83,41 @@ export class OpenAPILanguageServer {
     await this.analysisManager.discoverRoots();
   }
 
-  async onDidOpen(event: TextDocumentChangeEvent<TextDocument>) {
-    this.documentManager.onDidOpen(event.document);
+  onDidOpen(event: TextDocumentChangeEvent<TextDocument>) {
+    console.info("[onDidOpen] begin", event.document.uri);
+    this.documentManager.invalidate(event.document.uri);
+    console.info("[onDidOpen] end", event.document.uri);
   }
 
   // ----- TextDocuments handlers -----
   onDidChangeContent(event: TextDocumentChangeEvent<TextDocument>) {
+    console.info("[onDidChangeContent] begin", event.document.uri);
     this.documentManager.invalidate(event.document.uri);
+    console.info("[onDidChangeContent] end", event.document.uri);
   }
 
-  // ----- File operation handlers -----
-  onDidRenameFiles(params: RenameFilesParams) {
-    for (const file of params.files) {
-      this.documentManager.invalidate(file.oldUri);
-      this.documentManager.invalidate(file.newUri);
-    }
-    this.analysisManager.documentConnectivityLoader.invalidate([
-      "documentConnectivity",
-    ]);
-  }
-
-  onDidDeleteFiles(params: DeleteFilesParams) {
-    for (const file of params.files) {
-      this.documentManager.invalidate(file.uri);
-    }
-  }
-
-  onDidCreateFiles(params: CreateFilesParams) {
-    for (const file of params.files) {
-      this.documentManager.invalidate(file.uri);
-    }
-    this.analysisManager.documentConnectivityLoader.invalidate([
-      "documentConnectivity",
-    ]);
+  onDidClose(event: TextDocumentChangeEvent<TextDocument>) {
+    console.info("[onDidClose] begin", event.document.uri);
+    this.documentManager.invalidate(event.document.uri);
+    console.info("[onDidClose] end", event.document.uri);
   }
 
   onDidChangeWatchedFiles(params: DidChangeWatchedFilesParams) {
     let hasCreated = false;
     for (const change of params.changes) {
+      console.info("[onDidChangeWatchedFiles] begin", change.uri);
       this.documentManager.loader.invalidate(["serverDocument", change.uri]);
+      console.info("[onDidChangeWatchedFiles] end", change.uri);
       if (change.type === FileChangeType.Created) {
         hasCreated = true;
       }
     }
     if (hasCreated) {
+      console.info("[onDidChangeWatchedFiles] conn begin");
       this.analysisManager.documentConnectivityLoader.invalidate([
         "documentConnectivity",
       ]);
+      console.info("[onDidChangeWatchedFiles] conn end");
     }
   }
 

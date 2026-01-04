@@ -1,3 +1,7 @@
+# 0.1.6
+
+1. Fixed caching issues
+
 # 0.1.5
 
 1. Fixed path name display
