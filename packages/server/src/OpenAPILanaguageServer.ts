@@ -7,11 +7,16 @@ import {
 } from "@openapi-lsp/core/json-pointer";
 import { TextDocument } from "vscode-languageserver-textdocument";
 import {
+  CreateFilesParams,
   DefinitionLink,
   DefinitionParams,
+  DeleteFilesParams,
+  DidChangeWatchedFilesParams,
+  FileChangeType,
   Hover,
   HoverParams,
   MarkupKind,
+  RenameFilesParams,
   TextDocumentChangeEvent,
   TextDocuments,
 } from "vscode-languageserver";
@@ -86,8 +91,49 @@ export class OpenAPILanguageServer {
   }
 
   // ----- TextDocuments handlers -----
-  async onDidChangeContent(event: TextDocumentChangeEvent<TextDocument>) {
-    this.documentManager.onDidChangeContent(event.document);
+  onDidChangeContent(event: TextDocumentChangeEvent<TextDocument>) {
+    this.documentManager.invalidate(event.document.uri);
+  }
+
+  // ----- File operation handlers -----
+  onDidRenameFiles(params: RenameFilesParams) {
+    for (const file of params.files) {
+      this.documentManager.invalidate(file.oldUri);
+      this.documentManager.invalidate(file.newUri);
+    }
+    this.analysisManager.documentConnectivityLoader.invalidate([
+      "documentConnectivity",
+    ]);
+  }
+
+  onDidDeleteFiles(params: DeleteFilesParams) {
+    for (const file of params.files) {
+      this.documentManager.invalidate(file.uri);
+    }
+  }
+
+  onDidCreateFiles(params: CreateFilesParams) {
+    for (const file of params.files) {
+      this.documentManager.invalidate(file.uri);
+    }
+    this.analysisManager.documentConnectivityLoader.invalidate([
+      "documentConnectivity",
+    ]);
+  }
+
+  onDidChangeWatchedFiles(params: DidChangeWatchedFilesParams) {
+    let hasCreated = false;
+    for (const change of params.changes) {
+      this.documentManager.loader.invalidate(["serverDocument", change.uri]);
+      if (change.type === FileChangeType.Created) {
+        hasCreated = true;
+      }
+    }
+    if (hasCreated) {
+      this.analysisManager.documentConnectivityLoader.invalidate([
+        "documentConnectivity",
+      ]);
+    }
   }
 
   // ----- Language features handlers -----

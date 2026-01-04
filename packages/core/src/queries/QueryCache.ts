@@ -10,12 +10,13 @@ export type ComputeFn<T = CacheValue> = (
 ) => Promise<LoaderResult<T>>;
 
 export type CacheEntry = {
+  key: CacheKey;
   value: Option<CacheValue>;
   hash: Option<string>;
-  upstreamHashes: Map<CacheKey, string>;
+  upstreamHashes: Map<HashedCacheKey, string>;
   invalidated: boolean;
-  upstreams: Set<CacheKey>;
-  downstreams: Set<CacheKey>;
+  upstreams: Set<HashedCacheKey>;
+  downstreams: Set<HashedCacheKey>;
   computeFn: ComputeFn;
 };
 
@@ -70,6 +71,7 @@ export class QueryCache {
         entry.data.computeFn = computeFn;
       } else {
         this.store.set(k, {
+          key,
           computeFn,
           value: none(),
           hash: none(),
@@ -85,7 +87,11 @@ export class QueryCache {
       use: async (key: K): Promise<V> => {
         ensureKey(key);
 
-        return (await this.compute(key)) as V;
+        const v = (await this.compute(key)) as V;
+
+        console.info("[loader.use]", key);
+        this.logGraphviz();
+        return v;
       },
       load: async (ctx: CacheComputeContext, key: K): Promise<V> => {
         ensureKey(key);
@@ -108,41 +114,6 @@ export class QueryCache {
     }
   }
 
-  async set(key: CacheKey, entry: CacheEntryInput): Promise<void> {
-    const k = hashCacheKey(key);
-    this.store.set(k, {
-      ...entry,
-      value: none(),
-      hash: none(),
-      upstreamHashes: new Map(),
-      invalidated: false,
-      downstreams: new Set(),
-      upstreams: new Set(),
-    });
-    return;
-  }
-
-  async use<T>(key: CacheKey, computeFn: ComputeFn<T>): Promise<T> {
-    const k = hashCacheKey(key);
-
-    const entry = this.get(key);
-    if (entry.success) {
-      entry.data.computeFn = computeFn;
-    } else {
-      this.store.set(k, {
-        computeFn,
-        value: none(),
-        hash: none(),
-        upstreamHashes: new Map(),
-        invalidated: false,
-        downstreams: new Set(),
-        upstreams: new Set(),
-      });
-    }
-
-    return (await this.compute(key)) as T;
-  }
-
   async compute(key: CacheKey): Promise<CacheValue> {
     const hashed = hashCacheKey(key);
     /**
@@ -161,22 +132,25 @@ export class QueryCache {
     // Has cached value but marked invalidated → check if we can skip recomputation
     if (entry.invalidated) {
       // First, recursively ensure all upstreams are revalidated
-      for (const upstreamKey of entry.upstreams) {
-        await this.compute(upstreamKey);
+      for (const upstreamHashed of entry.upstreams) {
+        const upstream = this.store.get(upstreamHashed);
+        if (upstream) {
+          await this.compute(upstream.key);
+        }
       }
 
       // Compare upstream hashes with what we recorded
       let mismatchReason: (() => string) | null = null;
-      for (const [upstreamKey, oldHash] of entry.upstreamHashes) {
-        const upstream = unwrapGetResult(this.get(upstreamKey));
-        if (!upstream.hash.success) {
+      for (const [upstreamHashed, oldHash] of entry.upstreamHashes) {
+        const upstream = this.store.get(upstreamHashed);
+        if (!upstream || !upstream.hash.success) {
           mismatchReason = () =>
-            `upstream ${JSON.stringify(upstreamKey)} has no hash`;
+            `upstream ${upstreamHashed} has no hash`;
           break;
         }
         if (upstream.hash.data !== oldHash) {
           mismatchReason = () =>
-            `upstream ${JSON.stringify(upstreamKey)} hash changed`;
+            `upstream ${upstreamHashed} hash changed`;
           break;
         }
       }
@@ -213,9 +187,10 @@ export class QueryCache {
     const ctx: CacheComputeContext = {
       load: async (upstreamKey: CacheKey) => {
         // TODO: if we detect a cycle, we should throw an error here
+        const upstreamHashed = hashCacheKey(upstreamKey);
         const upstream = unwrapGetResult(this.get(upstreamKey));
-        upstream.downstreams.add(key);
-        entry.upstreams.add(upstreamKey);
+        upstream.downstreams.add(hashed);
+        entry.upstreams.add(upstreamHashed);
 
         // Ensure upstream is computed
         if (upstream.invalidated || !upstream.value.success) {
@@ -224,7 +199,7 @@ export class QueryCache {
 
         // Record upstream hash
         if (upstream.hash.success) {
-          entry.upstreamHashes.set(upstreamKey, upstream.hash.data);
+          entry.upstreamHashes.set(upstreamHashed, upstream.hash.data);
         }
 
         if (!upstream.value.success) {
@@ -247,10 +222,12 @@ export class QueryCache {
         this.inflight.delete(hashed);
 
         // For each old upstream that is no longer referenced, remove this entry from its downstreams
-        for (const oldUpstreamKey of oldUpstreams) {
-          if (!entry.upstreams.has(oldUpstreamKey)) {
-            const oldUpstream = unwrapGetResult(this.get(oldUpstreamKey));
-            oldUpstream.downstreams.delete(key);
+        for (const oldUpstreamHashed of oldUpstreams) {
+          if (!entry.upstreams.has(oldUpstreamHashed)) {
+            const oldUpstream = this.store.get(oldUpstreamHashed);
+            if (oldUpstream) {
+              oldUpstream.downstreams.delete(hashed);
+            }
           }
         }
       }
@@ -260,11 +237,15 @@ export class QueryCache {
     return p;
   }
 
-  invalidateByKey(
-    key: CacheKey,
-    visited: Set<HashedCacheKey> = new Set()
-  ): void {
+  invalidateByKey(key: CacheKey): void {
     const hashed = hashCacheKey(key);
+    this.invalidateByHashedKey(hashed, new Set());
+  }
+
+  private invalidateByHashedKey(
+    hashed: HashedCacheKey,
+    visited: Set<HashedCacheKey>
+  ): void {
     if (visited.has(hashed)) return; // Prevent re-visiting in diamond DAGs
     visited.add(hashed);
 
@@ -275,17 +256,59 @@ export class QueryCache {
 
     if (isRoot) {
       // Root node: clear value to force recomputation
-      this.log("invalidate", key);
+      this.log("invalidate", entry.key);
       entry.value = none();
     } else {
-      this.log("mark-invalidated", key);
+      this.log("mark-invalidated", entry.key);
     }
     // All nodes (root and downstream): mark as invalidated
     entry.invalidated = true;
 
     // Recursively mark downstreams as invalidated
-    for (const downstreamKey of entry.downstreams) {
-      this.invalidateByKey(downstreamKey, visited);
+    for (const downstreamHashed of entry.downstreams) {
+      this.invalidateByHashedKey(downstreamHashed, visited);
     }
+  }
+
+  // ----- Debug Helpers -----
+
+  /**
+   * Generate a GraphViz DOT representation of the cache dependency graph.
+   * Edges point from each node to its upstreams (direction of data flow).
+   * Node colors: green=valid, orange=invalidated, gray=no value
+   */
+  toGraphviz(): string {
+    const lines: string[] = ["digraph QueryCache {", "  rankdir=BT;"];
+
+    // Add nodes with labels and state info
+    for (const [hashedKey, entry] of this.store) {
+      // Escape quotes and backslashes for DOT format
+      const labelStr = JSON.stringify(entry.key);
+      const escapedLabel = labelStr.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+      const color = entry.invalidated
+        ? "orange"
+        : entry.value.success
+          ? "green"
+          : "gray";
+      lines.push(`  "${hashedKey}" [label="${escapedLabel}" color="${color}"];`);
+    }
+
+    // Add edges from each node to its upstreams (upstreams are now HashedCacheKey)
+    for (const [hashedKey, entry] of this.store) {
+      for (const upstreamHashed of entry.upstreams) {
+        lines.push(`  "${hashedKey}" -> "${upstreamHashed}";`);
+      }
+    }
+
+    lines.push("}");
+    return lines.join("\n");
+  }
+
+  logGraphviz(): void {
+    const dot = this.toGraphviz();
+    const encoded = encodeURIComponent(dot);
+    const url = `https://magjac.com/graphviz-visual-editor/?dot=${encoded}`;
+    // oxlint-disable-next-line
+    console.debug(`QueryCache graph:\n${dot}\n\nVisualize: ${url}`);
   }
 }

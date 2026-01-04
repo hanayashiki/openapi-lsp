@@ -60,8 +60,8 @@ export class ServerDocumentManager {
     // No-op: loader handles cache setup on first use
   }
 
-  onDidChangeContent(doc: TextDocument) {
-    this.loader.invalidate(["serverDocument", doc.uri]);
+  invalidate(uri: string) {
+    this.loader.invalidate(["serverDocument", uri]);
   }
 
   getServerDocument = async (uri: string): Promise<ServerDocument> => {
