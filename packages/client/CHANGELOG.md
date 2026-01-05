@@ -1,3 +1,7 @@
+# 0.3.0
+
+1. Find All References - discover all usages of schemas and components across your workspace
+
 # 0.2.0
 
 1. Support single file mode

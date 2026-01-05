@@ -16,10 +16,15 @@ import {
   ParseResult,
   DocumentConnectivity,
   GroupAnalysisResult,
+  GroupReferenceAnalysisResult,
+  IncomingReference,
 } from "./Analysis.js";
 import { parseSpecDocument } from "./analyze.js";
 import { collectNominalsFromEntryPoint } from "./solver.js";
-import { uriWithJsonPointerLoose } from "@openapi-lsp/core/json-pointer";
+import {
+  uriWithJsonPointerLoose,
+  parseUriWithJsonPointer,
+} from "@openapi-lsp/core/json-pointer";
 import { extendMap } from "@openapi-lsp/core/collections";
 import { OpenAPITag } from "@openapi-lsp/core/openapi";
 import { Workspace } from "../workspace/Workspace.js";
@@ -42,6 +47,10 @@ export class AnalysisManager {
   private groupLocalShapesLoader: CacheLoader<
     ["groupLocalShapes", string],
     Map<NodeId, LocalShape>
+  >;
+  groupReferenceAnalysisLoader: CacheLoader<
+    ["groupReferenceAnalysis", string],
+    GroupReferenceAnalysisResult
   >;
 
   constructor(
@@ -159,7 +168,7 @@ export class AnalysisManager {
         }
 
         // 3. Get member URIs for this group
-        const memberUris = dc.analysisGroups.get(groupId) ?? new Set([groupId]);
+        const memberUris = DocumentConnectivity.getMemberUris(dc, groupId);
 
         // 4. Phase 1: Collect shapes ONCE per document (cached by group)
         const allNodes = await this.groupLocalShapesLoader.load(ctx, [
@@ -196,7 +205,7 @@ export class AnalysisManager {
         const dc = await this.documentConnectivityLoader.load(ctx, [
           "documentConnectivity",
         ]);
-        const memberUris = dc.analysisGroups.get(groupId) ?? new Set([groupId]);
+        const memberUris = DocumentConnectivity.getMemberUris(dc, groupId);
 
         const allNodes = new Map<NodeId, LocalShape>();
 
@@ -213,6 +222,123 @@ export class AnalysisManager {
         };
       }
     );
+
+    this.groupReferenceAnalysisLoader = cache.createLoader(
+      async (
+        [_, groupId],
+        ctx
+      ): Promise<LoaderResult<GroupReferenceAnalysisResult>> => {
+        // 1. Load document connectivity for group info
+        const dc = await this.documentConnectivityLoader.load(ctx, [
+          "documentConnectivity",
+        ]);
+
+        // 2. Helper to check if a nodeId belongs to this group
+        const isNodeInGroup = (nodeId: NodeId): boolean => {
+          const parseResult = parseUriWithJsonPointer(nodeId);
+          if (!parseResult.success) return false;
+          return DocumentConnectivity.getGroupId(dc, parseResult.data.docUri) === groupId;
+        };
+
+        // 3. Load local shapes for this group
+        const localShapes = await this.groupLocalShapesLoader.load(ctx, [
+          "groupLocalShapes",
+          groupId,
+        ]);
+
+        // 4. Initialize result maps
+        const incomingReferences = new Map<NodeId, IncomingReference[]>();
+        const outgoingReferences = new Map<NodeId, IncomingReference[]>();
+
+        // Helper to add a reference to a map
+        const addReference = (
+          map: Map<NodeId, IncomingReference[]>,
+          targetNodeId: NodeId,
+          ref: IncomingReference
+        ) => {
+          if (!map.has(targetNodeId)) {
+            map.set(targetNodeId, []);
+          }
+          map.get(targetNodeId)!.push(ref);
+        };
+
+        // 5. Iterate through shapes to find refs
+        for (const [sourceNodeId, shape] of localShapes) {
+          if (shape.kind !== "ref") continue;
+
+          const targetNodeId = shape.target;
+
+          // Parse source nodeId to get sourceUri
+          const sourceParseResult = parseUriWithJsonPointer(sourceNodeId);
+          if (!sourceParseResult.success) continue;
+          const sourceUri = sourceParseResult.data.docUri;
+
+          // Get range info from DocumentReferenceManager
+          const docRefs = await this.referenceManager.load(ctx, sourceUri);
+
+          // Find all matching refs by comparing resolved target
+          const matchingRefs = docRefs.references.filter((r) => {
+            if (!r.resolved.success) return false;
+            const refTargetResult = parseUriWithJsonPointer(
+              r.ref,
+              sourceUri
+            );
+            if (!refTargetResult.success) return false;
+            return refTargetResult.data.url.toString() === targetNodeId;
+          });
+
+          // Process all matching refs
+          for (const matchingRef of matchingRefs) {
+            const incomingRef: IncomingReference = {
+              sourceNodeId,
+              sourceUri,
+              keyRange: matchingRef.keyRange,
+              pointerRange: matchingRef.pointerRange,
+            };
+
+            // Classify: internal or external
+            if (isNodeInGroup(targetNodeId)) {
+              addReference(incomingReferences, targetNodeId, incomingRef);
+            } else {
+              addReference(outgoingReferences, targetNodeId, incomingRef);
+            }
+          }
+        }
+
+        // 6. Collect incoming refs from upstream groups
+        const upstreamGroupIds =
+          dc.groupIncomingEdges.get(groupId) ?? new Set();
+        for (const upstreamId of upstreamGroupIds) {
+          const upstreamResult = await this.groupReferenceAnalysisLoader.load(
+            ctx,
+            ["groupReferenceAnalysis", upstreamId]
+          );
+
+          // Check upstream's outgoing refs for targets in our group
+          for (const [
+            targetNodeId,
+            refs,
+          ] of upstreamResult.outgoingReferences) {
+            if (isNodeInGroup(targetNodeId)) {
+              for (const ref of refs) {
+                addReference(incomingReferences, targetNodeId, ref);
+              }
+            }
+          }
+        }
+
+        const value: GroupReferenceAnalysisResult = {
+          groupId,
+          incomingReferences,
+          outgoingReferences,
+        };
+
+        return {
+          value,
+          hash: GroupReferenceAnalysisResult.getHash(value),
+        };
+      }
+    );
   }
 
   async getParseResult(uri: string): Promise<ParseResult> {
@@ -225,6 +351,15 @@ export class AnalysisManager {
 
   async discoverRoots(): Promise<DocumentConnectivity> {
     return await this.documentConnectivityLoader.use(["documentConnectivity"]);
+  }
+
+  async getGroupReferenceAnalysis(
+    groupId: string
+  ): Promise<GroupReferenceAnalysisResult> {
+    return await this.groupReferenceAnalysisLoader.use([
+      "groupReferenceAnalysis",
+      groupId,
+    ]);
   }
 
   /**

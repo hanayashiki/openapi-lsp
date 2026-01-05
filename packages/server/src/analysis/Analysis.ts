@@ -1,9 +1,10 @@
 import { OpenAPI } from "@openapi-lsp/core/openapi";
-import { SolveResult } from "@openapi-lsp/core/solver";
+import { NodeId, SolveResult } from "@openapi-lsp/core/solver";
 import { Range } from "vscode-languageserver-textdocument";
 import { SpecDocumentPath } from "./ServerDocument.js";
 import { ZodError } from "zod";
 import { ModuleResolutionResult } from "./ModuleResolution.js";
+import { md5 } from "js-md5";
 
 export interface ParseResult {
   document: OpenAPI.Document;
@@ -96,6 +97,14 @@ export namespace DocumentConnectivity {
    */
   export const getGroupId = (dc: DocumentConnectivity, uri: string): string =>
     dc.uriToAnalysisGroupId.get(uri) ?? uri;
+
+  /**
+   * Get member URIs for a group. Single-file groups return a Set containing just the group ID.
+   */
+  export const getMemberUris = (
+    dc: DocumentConnectivity,
+    groupId: string
+  ): Set<string> => dc.analysisGroups.get(groupId) ?? new Set([groupId]);
 }
 
 /**
@@ -107,3 +116,46 @@ export type GroupAnalysisResult = {
   groupId: string;
   solveResult: SolveResult;
 };
+
+/**
+ * Represents a single incoming reference to a target node.
+ * Contains the source nodeId and the range in the source document
+ * where the $ref is located.
+ */
+export type IncomingReference = {
+  /** The nodeId of the referencing node (contains the $ref) */
+  sourceNodeId: NodeId;
+  /** URI of the source document */
+  sourceUri: string;
+  /** Range of the $ref key in the source document */
+  keyRange: Range;
+  /** Range of the $ref value (pointer string) in the source document */
+  pointerRange: Range;
+};
+
+/**
+ * Result of group reference analysis.
+ * Maps each target nodeId to all incoming references.
+ */
+export type GroupReferenceAnalysisResult = {
+  groupId: string;
+  /** Map from target nodeId -> incoming references from within this group */
+  incomingReferences: Map<NodeId, IncomingReference[]>;
+  /** References from this group to external groups (for upstream propagation) */
+  outgoingReferences: Map<NodeId, IncomingReference[]>;
+};
+
+export namespace GroupReferenceAnalysisResult {
+  export function getHash(result: GroupReferenceAnalysisResult): string {
+    return md5(
+      JSON.stringify([
+        [...result.incomingReferences.entries()].sort(([a], [b]) =>
+          a.localeCompare(b)
+        ),
+        [...result.outgoingReferences.entries()].sort(([a], [b]) =>
+          a.localeCompare(b)
+        ),
+      ])
+    );
+  }
+}

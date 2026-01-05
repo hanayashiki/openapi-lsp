@@ -71,6 +71,10 @@ connection.onInitialize((params: InitializeParams): InitializeResult => {
     return server.onHover(params);
   });
 
+  connection.onReferences(async (params) => {
+    return server.onReferences(params);
+  });
+
   documents.onDidOpen((change) => {
     server.onDidOpen(change);
   });
@@ -92,6 +96,7 @@ connection.onInitialize((params: InitializeParams): InitializeResult => {
       textDocumentSync: TextDocumentSyncKind.Incremental,
       hoverProvider: true,
       definitionProvider: true,
+      referencesProvider: true,
     },
   };
 });

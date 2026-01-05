@@ -13,7 +13,9 @@ import {
   FileChangeType,
   Hover,
   HoverParams,
+  Location,
   MarkupKind,
+  ReferenceParams,
   TextDocumentChangeEvent,
   TextDocuments,
 } from "vscode-languageserver";
@@ -255,6 +257,30 @@ export class OpenAPILanguageServer {
   }
 
   /**
+   * Resolve a nodeId through $ref chains to get the ultimate value node.
+   * Uses the solver's getValueNodeId to follow refs to their target.
+   */
+  private async resolveToValueNode(nodeId: string): Promise<string | null> {
+    const parseResult = parseUriWithJsonPointer(nodeId);
+    if (!parseResult.success) return null;
+
+    const targetDocUri = parseResult.data.docUri;
+
+    const dc = await this.analysisManager.documentConnectivityLoader.use([
+      "documentConnectivity",
+    ]);
+    if (!dc.graph.has(targetDocUri)) return null;
+
+    const groupId = DocumentConnectivity.getGroupId(dc, targetDocUri);
+    const { solveResult } = await this.analysisManager.groupAnalysisLoader.use([
+      "groupAnalysis",
+      groupId,
+    ]);
+
+    return solveResult.getValueNodeId(nodeId);
+  }
+
+  /**
    * Resolve $ref items in a Parameters array to their actual values.
    * Uses the solver's getValueNodeId to find the ultimate target of each ref.
    * Parameter nodes are special: their `name` is at the value, so it would not be possible for us
@@ -278,20 +304,9 @@ export class OpenAPILanguageServer {
           );
           continue;
         }
-        const targetDocUri = pointerResult.data.docUri;
         const targetNodeId = pointerResult.data.url.toString();
 
-        const dc = await this.analysisManager.documentConnectivityLoader.use([
-          "documentConnectivity",
-        ]);
-        const groupId = DocumentConnectivity.getGroupId(dc, targetDocUri);
-        const { solveResult } =
-          await this.analysisManager.groupAnalysisLoader.use([
-            "groupAnalysis",
-            groupId,
-          ]);
-        const valueNodeId = solveResult.getValueNodeId(targetNodeId);
-
+        const valueNodeId = await this.resolveToValueNode(targetNodeId);
         if (!valueNodeId) {
           console.warn(
             `[resolveParameterRefs] Could not resolve nominal at index ${item.$ref}`
@@ -334,5 +349,115 @@ export class OpenAPILanguageServer {
     }
 
     return resolved;
+  }
+
+  async onReferences(params: ReferenceParams): Promise<Location[] | null> {
+    const uri = params.textDocument.uri;
+    const position = params.position;
+
+    const spec = await this.documentManager.getServerDocument(uri);
+    if (spec.type !== "openapi" && spec.type !== "component") {
+      return null;
+    }
+
+    let targetNodeId: string;
+    let isQueryingFromRef = false;
+
+    // Check if cursor is on a $ref value
+    const refResult = spec.yaml.getRefAtPosition(position);
+    if (refResult) {
+      // Resolve the $ref to its target value node
+      const pointerResult = parseUriWithJsonPointer(refResult.ref, uri);
+      if (!pointerResult.success) return null;
+
+      const refTargetNodeId = pointerResult.data.url.toString();
+      const valueNodeId = await this.resolveToValueNode(refTargetNodeId);
+      if (!valueNodeId) return null;
+      targetNodeId = valueNodeId;
+      isQueryingFromRef = true;
+    } else {
+      // Check if cursor is on a YAML key
+      const keyResult = spec.yaml.getKeyAtPosition(position);
+      if (!keyResult) {
+        return null;
+      }
+
+      const keyNodeId = uriWithJsonPointerLoose(uri, keyResult.path);
+
+      // If the key's value is a $ref, resolve to the target
+      const keyValue = spec.yaml.getValueAtPath(keyResult.path);
+      if (keyValue && typeof keyValue === "object" && "$ref" in keyValue) {
+        const pointerResult = parseUriWithJsonPointer(
+          keyValue.$ref as string,
+          uri
+        );
+        if (!pointerResult.success) return null;
+
+        const refTargetNodeId = pointerResult.data.url.toString();
+        const valueNodeId = await this.resolveToValueNode(refTargetNodeId);
+        if (!valueNodeId) return null;
+        targetNodeId = valueNodeId;
+        isQueryingFromRef = true;
+      } else {
+        targetNodeId = keyNodeId;
+      }
+    }
+
+    // Get document connectivity and group for the target
+    const targetParseResult = parseUriWithJsonPointer(targetNodeId);
+    if (!targetParseResult.success) return null;
+
+    const dc = await this.analysisManager.documentConnectivityLoader.use([
+      "documentConnectivity",
+    ]);
+    if (!dc.graph.has(targetParseResult.data.docUri)) return null;
+
+    const groupId = DocumentConnectivity.getGroupId(
+      dc,
+      targetParseResult.data.docUri
+    );
+    const refAnalysis =
+      await this.analysisManager.groupReferenceAnalysisLoader.use([
+        "groupReferenceAnalysis",
+        groupId,
+      ]);
+
+    const incomingRefs = refAnalysis.incomingReferences.get(targetNodeId);
+
+    // Build result locations
+    const locations: Location[] = [];
+
+    // If querying from a $ref, include the definition/value node location
+    if (isQueryingFromRef) {
+      const targetDoc = await this.documentManager.getServerDocument(
+        targetParseResult.data.docUri
+      );
+      if (targetDoc.type !== "tomb") {
+        const localPointer =
+          "#/" + targetParseResult.data.jsonPointer.join("/");
+        const defLink = targetDoc.yaml.getDefinitionLinkByRef(
+          localPointer,
+          targetParseResult.data.docUri
+        );
+        if (defLink) {
+          locations.push({
+            uri: defLink.targetUri,
+            range: defLink.targetSelectionRange,
+          });
+        }
+      }
+    }
+
+    // Add all incoming references
+    if (incomingRefs) {
+      for (const ref of incomingRefs) {
+        locations.push({
+          uri: ref.sourceUri,
+          range: ref.pointerRange,
+        });
+      }
+    }
+
+    return locations.length > 0 ? locations : null;
   }
 }

@@ -7,6 +7,7 @@ Intelligent language support for OpenAPI/Swagger specifications in VS Code, desi
 - **Type Inference** — Automatically infers and displays types from your OpenAPI schemas, including referenced files.
 - **Hover Information** — View schemas rendered as human-readable types
 - **Go to Definition** — Jump to component definitions across files
+- **Find All References** — Discover all usages of schemas and components across your workspace
 - **Cross-File Analysis** — Full support for external `$ref` references
 - **Secure by Default** — Workspace-restricted file access prevents data leaks
 
@@ -40,6 +41,18 @@ Jump directly to component definitions or peek them inline.
 <summary>Screenshot</summary>
 
 ![Go to definition](/docs/def.png)
+</details>
+
+### Find All References
+
+Find all places where a schema or component is referenced across your workspace.
+
+Use `Shift+F12` or right-click and select "Find All References" on any definition or `$ref`.
+
+<details>
+<summary>Screenshot</summary>
+
+![Find All References](/docs/references.png)
 </details>
 
 ## Installation
@@ -101,7 +114,6 @@ To get full cross-file support in single file mode, manually open all referenced
 
 ## Roadmap
 
-- Find All References
 - Diagnostics
 - Autocomplete
 - Remote `$ref` support
