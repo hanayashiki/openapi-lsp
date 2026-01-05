@@ -1,3 +1,7 @@
+# 0.3.2
+
+1. Fix configuration description typo
+
 # 0.3.1
 
 1. Display raw names in hover headers
