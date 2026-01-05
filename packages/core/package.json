@@ -13,7 +13,8 @@
     "./solver": "./src/solver/index.ts",
     "./configuration": "./src/configuration/index.ts",
     "./collections": "./src/collections/index.ts",
-    "./ecmascript": "./src/ecmascript/index.ts"
+    "./ecmascript": "./src/ecmascript/index.ts",
+    "./hash": "./src/hash.ts"
   },
   "scripts": {
     "test": "vitest run",

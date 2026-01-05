@@ -4,6 +4,7 @@ import {
   LoaderResult,
   QueryCache,
 } from "@openapi-lsp/core/queries";
+import { hashPlainObject } from "@openapi-lsp/core/hash";
 import {
   Solver,
   LocalShape,
@@ -37,6 +38,10 @@ export class AnalysisManager {
   groupAnalysisLoader: CacheLoader<
     ["groupAnalysis", string],
     GroupAnalysisResult
+  >;
+  private groupLocalShapesLoader: CacheLoader<
+    ["groupLocalShapes", string],
+    Map<NodeId, LocalShape>
   >;
 
   constructor(
@@ -156,16 +161,11 @@ export class AnalysisManager {
         // 3. Get member URIs for this group
         const memberUris = dc.analysisGroups.get(groupId) ?? new Set([groupId]);
 
-        // 4. Phase 1: Collect shapes ONCE per document
-        const allNodes = new Map<NodeId, LocalShape>();
-
-        for (const uri of memberUris) {
-          const doc = await this.documentManager.load(ctx, uri);
-          if (doc.type === "tomb") continue;
-
-          // Use YamlDocument.collectLocalShapes() - collects ALL shapes in one pass
-          extendMap(allNodes, doc.yaml.collectLocalShapes(uri));
-        }
+        // 4. Phase 1: Collect shapes ONCE per document (cached by group)
+        const allNodes = await this.groupLocalShapesLoader.load(ctx, [
+          "groupLocalShapes",
+          groupId,
+        ]);
 
         // 5. Phase 2: Collect nominals with fixed-point iteration for SCC
         const allNominals = await this.collectNominalsWithFixedPoint(
@@ -185,6 +185,32 @@ export class AnalysisManager {
         // Hash based on the solver result's serialized nominals
         const hash = solveResult.getHash();
         return { value, hash };
+      }
+    );
+
+    this.groupLocalShapesLoader = cache.createLoader(
+      async (
+        [_, groupId],
+        ctx
+      ): Promise<LoaderResult<Map<NodeId, LocalShape>>> => {
+        const dc = await this.documentConnectivityLoader.load(ctx, [
+          "documentConnectivity",
+        ]);
+        const memberUris = dc.analysisGroups.get(groupId) ?? new Set([groupId]);
+
+        const allNodes = new Map<NodeId, LocalShape>();
+
+        for (const uri of memberUris) {
+          const doc = await this.documentManager.load(ctx, uri);
+          if (doc.type === "tomb") continue;
+
+          extendMap(allNodes, doc.yaml.collectLocalShapes(uri));
+        }
+
+        return {
+          value: allNodes,
+          hash: hashPlainObject([...allNodes.entries()]),
+        };
       }
     );
   }
