@@ -59,7 +59,7 @@
         "openapi-lsp.discoverRoots.pattern": {
           "type": "string",
           "default": "**/*",
-          "description": "The minimatch (https://www.npmjs.com/package/minimatch) glob pattern to ignore during OpenAPI document discovery"
+          "description": "The minimatch (https://www.npmjs.com/package/minimatch) glob pattern for OpenAPI document discovery"
         },
         "openapi-lsp.discoverRoots.ignore": {
           "type": "string",
