@@ -3,7 +3,7 @@ import {
   parseUriWithJsonPointer,
   uriWithJsonPointerLoose,
   JsonPointerLoose,
-  deriveIdentifierFromUri,
+  deriveNameFromUri,
 } from "@openapi-lsp/core/json-pointer";
 import { TextDocument } from "vscode-languageserver-textdocument";
 import {
@@ -237,7 +237,7 @@ export class OpenAPILanguageServer {
       const name: string =
         nominal === "PathItem"
           ? String(targetPath.at(-1) ?? "_")
-          : unwrap(deriveIdentifierFromUri(targetNodeId)); // We create the URI from ourselve, cannot fail.
+          : unwrap(deriveNameFromUri(targetNodeId)); // We create the URI from ourselve, cannot fail.
 
       // Serialize: use nominal serializer if available, else literal fallback
       const markdown = nominal
@@ -433,10 +433,8 @@ export class OpenAPILanguageServer {
         targetParseResult.data.docUri
       );
       if (targetDoc.type !== "tomb") {
-        const localPointer =
-          "#/" + targetParseResult.data.jsonPointer.join("/");
         const defLink = targetDoc.yaml.getDefinitionLinkByRef(
-          localPointer,
+          targetParseResult.data.jsonPointer,
           targetParseResult.data.docUri
         );
         if (defLink) {

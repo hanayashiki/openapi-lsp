@@ -1,3 +1,7 @@
+# 0.3.1
+
+1. Display raw names in hover headers
+
 # 0.3.0
 
 1. Find All References - discover all usages of schemas and components across your workspace

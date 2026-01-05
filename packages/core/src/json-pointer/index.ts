@@ -178,10 +178,10 @@ export function parseUriWithJsonPointer(
 }
 
 /**
- * Derive the identifier name of node by the ref
- * Useful to format with typescript syntax highlight.
+ * Derive the raw name of node by the ref (no identifier coercion).
+ * Use this when you need the original name (e.g., for markdown headers).
  */
-export function deriveIdentifierFromUri(
+export function deriveNameFromUri(
   uri: string,
   baseUri: string = "file:///"
 ): DeriveNameResult {
@@ -194,7 +194,7 @@ export function deriveIdentifierFromUri(
   const { jsonPointer, url } = r.data;
 
   if (jsonPointer.length > 0) {
-    return ok(trimToIdentifier(jsonPointer.at(-1)!));
+    return ok(jsonPointer.at(-1)!);
   } else {
     const lastPathSegment = decodeURIComponent(
       url.pathname
@@ -204,6 +204,23 @@ export function deriveIdentifierFromUri(
         .at(-1) ?? ""
     );
 
-    return ok(trimToIdentifier(lastPathSegment));
+    return ok(lastPathSegment);
   }
+}
+
+/**
+ * Derive the identifier name of node by the ref
+ * Useful to format with typescript syntax highlight.
+ */
+export function deriveIdentifierFromUri(
+  uri: string,
+  baseUri: string = "file:///"
+): DeriveNameResult {
+  const r = deriveNameFromUri(uri, baseUri);
+
+  if (!r.success) {
+    return r;
+  }
+
+  return ok(trimToIdentifier(r.data));
 }

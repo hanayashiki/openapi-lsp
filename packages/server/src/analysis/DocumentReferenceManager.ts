@@ -11,6 +11,7 @@ import { isPositionInRange } from "./utils.js";
 import {
   isLocalPointer,
   parseUriWithJsonPointer,
+  parseJsonPointer,
 } from "@openapi-lsp/core/json-pointer";
 import { Position } from "vscode-languageserver-textdocument";
 import { DefinitionLink } from "vscode-languageserver";
@@ -109,7 +110,9 @@ export class DocumentReferenceManager {
       const sourceDoc = await this.documentManager.getServerDocument(uri);
       if (sourceDoc.type !== "openapi" && sourceDoc.type !== "component")
         return null;
-      return sourceDoc.yaml.getDefinitionLinkByRef(docRef.ref, uri);
+      const parseResult = parseJsonPointer(docRef.ref);
+      if (!parseResult.success) return null;
+      return sourceDoc.yaml.getDefinitionLinkByRef(parseResult.data, uri);
     }
 
     // Handle external refs
@@ -118,13 +121,12 @@ export class DocumentReferenceManager {
     const targetDoc = docRef.resolved.data;
     if (targetDoc.type === "tomb") return null;
 
-    // Extract fragment using parseUriWithJsonPointer
+    // Extract JSON pointer using parseUriWithJsonPointer
     const parseResult = parseUriWithJsonPointer(docRef.ref, "file:///");
     if (!parseResult.success) return null;
-    const fragment = parseResult.data.url.hash || "#";
 
-    // Jump to JSON pointer location in target file (empty fragment = root = position 0)
-    return targetDoc.yaml.getDefinitionLinkByRef(fragment, targetDoc.uri);
+    // Jump to JSON pointer location in target file
+    return targetDoc.yaml.getDefinitionLinkByRef(parseResult.data.jsonPointer, targetDoc.uri);
   };
 
   load = (

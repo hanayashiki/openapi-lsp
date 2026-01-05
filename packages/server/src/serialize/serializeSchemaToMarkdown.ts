@@ -1,4 +1,5 @@
 import { OpenAPI } from "@openapi-lsp/core/openapi";
+import { trimToIdentifier } from "@openapi-lsp/core/ecmascript";
 import type { SerializeOptions, SerializerContext } from "./types.js";
 import { Printer } from "./Printer.js";
 import { serializeSchemaOrRef } from "./serializeSchema.js";
@@ -34,8 +35,8 @@ export function serializeSchemaToMarkdown(
   serializeSchemaOrRef(schema, ctx);
   const serialized = printer.toString();
 
-  // Add code block
-  const nameOrInline = name ? `type ${name} = ` : "";
+  // Add code block - coerce name to valid TypeScript identifier
+  const nameOrInline = name ? `type ${trimToIdentifier(name)} = ` : "";
   parts.push(`\`\`\`typescript\n${nameOrInline}${serialized}\n\`\`\``);
 
   return parts.join("\n\n");

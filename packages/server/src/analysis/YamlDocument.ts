@@ -15,11 +15,10 @@ import { Position, Range } from "vscode-languageserver-textdocument";
 import { DefinitionLink } from "vscode-languageserver";
 import { md5 } from "js-md5";
 import {
-  parseJsonPointer,
   parseUriWithJsonPointer,
-  isLocalPointer,
   uriWithJsonPointerLoose,
   JsonPointerLoose,
+  JsonPointer,
 } from "@openapi-lsp/core/json-pointer";
 import { LocalShape, NodeId } from "@openapi-lsp/core/solver";
 
@@ -214,26 +213,15 @@ export class YamlDocument {
   }
 
   /**
-   * Get DefinitionLink for a local $ref path (e.g., "#/components/schemas/Pet")
-   * Returns null if path doesn't exist or isn't a local ref
+   * Get DefinitionLink for a JSON pointer path.
+   * Returns null if path doesn't exist.
    */
   getDefinitionLinkByRef(
-    ref: string,
+    jsonPointer: JsonPointer,
     targetUri: string
   ): DefinitionLink | null {
-    if (!isLocalPointer(ref)) {
-      return null;
-    }
-
-    const parseResult = parseJsonPointer(ref);
-    if (!parseResult.success) {
-      return null;
-    }
-
-    const pathSegments = parseResult.data;
-
     // Handle root reference (empty path = whole document)
-    if (pathSegments.length === 0) {
+    if (jsonPointer.length === 0) {
       const rootRange = this.ast.contents?.range;
       if (!rootRange) return null;
       const range = this.toTextDocumentRange(rootRange);
@@ -247,7 +235,7 @@ export class YamlDocument {
     let currentNode: Node | null = this.ast.contents;
     let keyNode: Scalar | null = null;
 
-    for (const segment of pathSegments) {
+    for (const segment of jsonPointer) {
       if (!isMap(currentNode)) return null;
 
       const pair = currentNode.items.find(

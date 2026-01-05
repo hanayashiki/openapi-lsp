@@ -22,6 +22,8 @@ First, run all pre-commit hooks to ensure code quality, **without sandboxing**:
 ```bash
 npm run lint
 npm run test
+
+# Run this without sandbox
 npm run build
 ```
 
@@ -32,6 +34,9 @@ Find the last git tag and show commits since then:
 ```bash
 # Get the latest tag
 git describe --tags --abbrev=0
+
+# Show current changes
+git diff
 
 # Show commits since last tag
 git log <last-tag>..HEAD --oneline
