@@ -25,13 +25,20 @@ export function serializeArray(
   });
   const itemType = tempPrinter.toString();
 
-  // Use Array<T> for complex types, T[] for simple
-  if (
+  // Check if complex type (contains union, intersection, or object braces)
+  const isComplex =
     itemType.includes(" | ") ||
     itemType.includes(" & ") ||
-    itemType.includes("{")
-  ) {
-    printer.write(`Array<${itemType}>`);
+    itemType.includes("{");
+
+  if (isComplex) {
+    // For complex types, serialize directly to main printer for proper indentation
+    printer.write("Array<");
+    serializeSchemaOrRef(schema.items, {
+      ...ctx,
+      currentDepth: ctx.currentDepth + 1,
+    });
+    printer.write(">");
   } else {
     printer.write(`${itemType}[]`);
   }
