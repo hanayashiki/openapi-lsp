@@ -1,3 +1,7 @@
+# 0.4.0
+
+1. Improve hover display for JSON and code strings with syntax highlighting
+
 # 0.3.3
 
 1. Fix hover type indentation and limit union/intersection display
