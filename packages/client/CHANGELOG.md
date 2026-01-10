@@ -1,3 +1,7 @@
+# 0.3.3
+
+1. Fix hover type indentation and limit union/intersection display
+
 # 0.3.2
 
 1. Fix configuration description typo
